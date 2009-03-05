@@ -14,6 +14,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # This file is basically gdb.command.backtrace with my coloring code kludged in
+#  (from the Archer gdb project)
+# Well, okay, now it has the ContextHelper and so does much more work and is
+#  arguably less efficient, perhaps more ugly, etc. etc.
 
 import gdb, gdb.backtrace
 from gdb.FrameIterator import FrameIterator
