@@ -1,5 +1,5 @@
-# chroniquery, a chronicle-recorder python interface/abstraction library
-#    Copyright (C) 2007 Andrew Sutherland (sombrero@alum.mit.edu)
+# pyflam, a gaudy colorizing library
+#    Copyright (C) 2009 Andrew Sutherland (sombrero@alum.mit.edu)
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -14,15 +14,17 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-### IMPORTANTE!  pyflam is intended to be its own standalone library
-###  and will be released under at least LGPL v3 if not something
-###  more permissive.  However, it's been promoted up to GPL v3 for
-###  inclusion with chroniquery for now. 
+### This has been extracted out of my chroniquery library.  It was already
+###  GPLv3 which works out well considering it is put here to be called by code
+###  that is explicitly GPL v3 in the first place!  However, this will probably
+###  still get licensed under something more permissive...
 
 import re, sys
         
 class FlamOut(object):
-    def __init__(self):
+    def __init__(self, fout=None):
+        self.fout = fout or sys.stdout
+
         self._cmap = {}
         self._pat = re.compile('(?:{([^}]+)})|(%([-#0 +]*)(\d*)\.?(\d*)([sdx]))')
 
@@ -70,6 +72,16 @@ class FlamOut(object):
         
         self.map_fg('k', 129)
         self.map_fg('v', 38)
+        self.map_fg('sk', 0x36)
+        self.map_fg('sv', 0x18)
+
+        interesting_colors = [0x3f, 0x63, 0x87, 0xab, 0xcf, 0xce, 0xcd, 0xcc,
+                              0x45, 0x69, 0x8d, 0xb1, 0xd5, 0xd4, 0xd3, 0xd2,
+                              0x4b, 0x6f, 0x93, 0xb7, 0xdb, 0xda, 0xd9, 0xd8,
+                              0x51, 0x75, 0x99, 0xbd, 0xe1, 0xe0, 0xdf, 0xde]
+        self.INTERESTING_COUNT = len(interesting_colors)
+        for i, c in enumerate(interesting_colors):
+            self.map_fg('i%d' % i, c)
     
     _ANSI_COLOR_LUT = ((0,0,0), (170,0,0), (0,170,0), (170,85,0),
                        (0,0,170), (170,0,170), (0,170,170), (170,170,170),
@@ -173,7 +185,7 @@ class FlamOut(object):
             # TODO: also handle the wrapping as required
             ostr = indent + ostr.replace('\n', '\n' + indent)
         
-        print ostr
+        self.fout.write(ostr + '\n')
     
     def pp(self, o, label=None, indent=0):
         if label:
@@ -208,7 +220,7 @@ class FlamOut(object):
                     post ='}'
                 else:
                     pre= ' '
-                    post = ','                
+                    post = ','
                 if type(v) in (tuple, list, dict):
                     self('{n}%s{k}%s{n}:', pre, k)
                     self.i(1)
@@ -232,10 +244,9 @@ class FlamOut(object):
 
 class FlamHTML(FlamOut):
     def __init__(self, fout, style=True):
-        super(FlamHTML, self).__init__()
+        super(FlamHTML, self).__init__(fout)
         
         self._style = style
-        self.fout = fout
 
     _CTYPE_MAP= {'fg': 'color',
                  'bg': 'background-color'}
