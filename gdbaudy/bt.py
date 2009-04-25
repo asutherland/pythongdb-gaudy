@@ -183,16 +183,16 @@ class ColorFrameWrapper:
                 fmtvals.append(key)
                 fmtvals.append(val)
 
-        pout('\n'.join(fmtbits), *fmtvals)
+        pout('\n'.join(fmtbits) + '{-fg}', *fmtvals)
         #pout('{n}(' + '{n}, '.join(fmtbits) + '{n})', *fmtvals)
 
     # FIXME: this should probably just be a method on gdb.Frame.
     # But then we need stream wrappers.
     def describe (self, frame_num, full):
         if self.frame.type () == gdb.DUMMY_FRAME:
-            pout('{s}%2.2d <function called from gdb>', frame_num)
+            pout('{s}%2.2d <function called from gdb>{-fg}', frame_num)
         elif self.frame.type () == gdb.SIGTRAMP_FRAME:
-            pout('{s}%2.2d <signal handler called>', frame_num)
+            pout('{s}%2.2d <signal handler called>{-fg}', frame_num)
         else:
             sal = self.frame.find_sal ()
             pc = self.frame.pc ()
@@ -200,15 +200,13 @@ class ColorFrameWrapper:
             if not name:
                 name = "??"
 
-            
-
             if not self.frame.name () or (not sal.symtab or not sal.symtab.filename):
                 lib = gdb.solib_address (pc)
                 if lib:
                     # stream.write (" from " + lib)
                     pass
 
-            pout('{s}%2.2d {ln}%08x {s}in {fn}%s {s}at {cn}%s{s}:{ln}%d',
+            pout('{s}%2.2d {ln}%08x {s}in {fn}%s {s}at {cn}%s{s}:{ln}%d{-fg}',
                  frame_num, pc, name,
                  sal.symtab and sal.symtab.filename and self.context.chewPath(sal.symtab.filename) or '???',
                  sal.line)

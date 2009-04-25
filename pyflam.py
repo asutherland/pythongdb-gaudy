@@ -37,6 +37,7 @@ class FlamOut(object):
         self._verbose = kwargs.get('verbose', self._verbose)
 
     def init_map(self):
+        self.map_control('-fg', '39')
         self.map_control('-bg', '49')
 
         self.map_fg('h', 127)

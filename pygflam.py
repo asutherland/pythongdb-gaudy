@@ -13,7 +13,7 @@ from pygments.token import Token, Comment, Name, Keyword, \
 
 class FlamFruityStyle(Style):
     """
-    Augmented version of pygments' FruityStyle from 0.10-1ubuntu2
+    Augmented/modified version of pygments' FruityStyle from 0.10-1ubuntu2
     
     !!! from the class docstring:
 
@@ -44,6 +44,8 @@ class FlamFruityStyle(Style):
         Keyword.Type:       '#cdcaa9 bold',
         Name.Constant:      '#0086d2',
         Comment.Preproc:    '#ff0007 bold',
+        ### custom propagation from above
+        Name.Function.EventHandler: '#ff0086 bold',
         ### arguably standard for dark background
         Token:              '#ffffff',
         Generic.Heading:    '#ffffff bold',
@@ -151,7 +153,10 @@ class MozillaCodeFilter(Filter):
                     elif value in self.NS_NATIVE_TYPES:
                         yield Keyword.Type, value
                         continue
-
+                elif value.startswith('On'):
+                    if value[2].isupper():
+                        yield Name.Function.EventHandler, value
+                        continue
 
             yield ttype, value
 
