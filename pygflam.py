@@ -34,23 +34,25 @@ class FlamFruityStyle(Style):
 
     styles = {
         Whitespace:         '#888888',
-        Token:              '#ffffff',
         Generic.Output:     '#444444 bg:#222222',
-        Keyword:            '#fb660a bold',
         Keyword.Pseudo:     'nobold',
         Number:             '#0086f7 bold',
-        Name.Tag:           '#fb660a bold',
-        Name.Variable:      '#fb660a',
-        Name.Constant:      '#fb660a',
         Comment:            '#008800 bg:#0f140f italic',
         Name.Attribute:     '#ff0086 bold',
         String:             '#0086d2',
         Name.Function:      '#ff0086 bold',
-        Generic.Heading:    '#ffffff bold',
         Keyword.Type:       '#cdcaa9 bold',
-        Generic.Subheading: '#ffffff bold',
         Name.Constant:      '#0086d2',
         Comment.Preproc:    '#ff0007 bold',
+        ### arguably standard for dark background
+        Token:              '#ffffff',
+        Generic.Heading:    '#ffffff bold',
+        Generic.Subheading: '#ffffff bold',
+        ### replaced...
+        Keyword:            '#ff7c00 bold',
+        Name.Tag:           '#ff7c00 bold',
+        Name.Variable:      '#ff7c00',
+        Name.Constant:      '#ff7c00',
         ### augmentations follow from here
         ## This is where :: should be, but...
         Keyword.Declaration: '#888888',
@@ -58,12 +60,12 @@ class FlamFruityStyle(Style):
         Operator:            '#888888',
         Punctuation:         '#888888',
         # mozilla code filter color things...
-        Name.Variable.Static: '#fb660a',
-        Name.Variable.Member: '#ff8686',
-        Name.Variable.Argument: '#cd0a86', #ff0086
-        Name.Interface: '#cd660a', # fb660a
-        Name.Class: '#22cacd', ##ff0086',
-        Name.Class.Scaffolding: '#888844',
+        Name.Variable.Static: '#720cac',
+        Name.Variable.Member: '#920cbc',
+        Name.Variable.Argument: '#ac0abb',
+        Name.Interface: '#34d800',
+        Name.Class: '#03899c',
+        Name.Class.Scaffolding: '#1049a9',
     }
 
 class MozillaCodeFilter(Filter):
