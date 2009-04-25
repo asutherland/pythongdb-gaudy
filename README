@@ -3,7 +3,9 @@ to your ~/.gdbinit, add
 ### CUT HERE ###
 python import sys
 python sys.path[0:0] = ["/path/to/pythongdb-gaudy/"]
+# backtrace, no external dependencies
 python import gdbaudy.bt
+# syntax-highlighting source list, needs pygments
 python import gdbaudy.pyglist
 ### STOP CUTTING HERE ###
 
