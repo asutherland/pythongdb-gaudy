@@ -37,6 +37,8 @@ class FlamOut(object):
         self._verbose = kwargs.get('verbose', self._verbose)
 
     def init_map(self):
+        self.map_control('-bg', '49')
+
         self.map_fg('h', 127)
         # normal
         self.map_fg('n', 0xf8)
@@ -110,12 +112,63 @@ class FlamOut(object):
             gray = color - 232
             level = gray * 10 + 8
             return (level, level, level)
-    
+
+    _COLOR_HEXMAP = None
+    @property
+    def _color_hexmap(self):
+        if self._COLOR_HEXMAP is not None:
+            return self._COLOR_HEXMAP
+        chmap = self._COLOR_HEXMAP = {}
+        for index in range(256):
+            chmap[index] = self._crack_colorcode(index)
+        return chmap
+
+    def _parse_hexcolor(self, hexcolor):
+        '''@return (r, g, b) triple given a hex-color string'''
+        if hexcolor[0] == '#':
+            hexcolor = hexcolor[1:]
+        if len(hexcolor) == 6:
+            return (int(hexcolor[0:2], 16),
+                    int(hexcolor[2:4], 16),
+                    int(hexcolor[4:6], 16))
+        else:
+            def halp(s):
+                v = int(s, 16)
+                return v * 16 + v
+            return (halp(hexcolor[0]),
+                    halp(hexcolor[1]),
+                    halp(hexcolor[2]))
+
+    def hexcolor_to_colorcode(self, hexcolor):
+        bestcode = None
+        bestdist = 256 * 256 * 4
+        # desired red, green, blue
+        dr, dg, db = self._parse_hexcolor(hexcolor)
+        for code, crgb in self._color_hexmap.items():
+            # candidate red, green, blue
+            cr, cg, cb = crgb
+            dist = ((dr - cr) * (dr - cr) +
+                    (dg - cg) * (dg - cg) +
+                    (db - cb) * (db - cb))
+            if dist < bestdist:
+                bestcode = code
+                bestdist = dist
+        return bestcode
+
     def map_fg(self, name, code):
         self._cmap[name] = '\x1b[38;5;%dm' % code
 
+    def map_fg_hex(self, name, hexvalue):
+        self.map_fg(name, self.hexcolor_to_colorcode(hexvalue))
+
     def map_bg(self, name, code):
         self._cmap[name] = '\x1b[48;5;%dm' % code
+
+    def map_bg_hex(self, name, hexvalue):
+        self.map_bg(name, self.hexcolor_to_colorcode(hexvalue))
+
+    def map_control(self, name, bytestr):
+        self._cmap[name] = '\x1b[%sm' % (bytestr,)
 
     def i(self, indentAdjust):
         self._indentLevel += indentAdjust

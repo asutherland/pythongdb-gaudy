@@ -1,0 +1,13 @@
+to your ~/.gdbinit, add
+
+### CUT HERE ###
+python import sys
+python sys.path[0:0] = ["/path/to/pythongdb-gaudy/"]
+python import gdbaudy.bt
+python import gdbaudy.pyglist
+### STOP CUTTING HERE ###
+
+Then you can use:
+- "cbt" as an awesome colorized backtrace
+- "sl" as an awesome colorized / syntax highlighting "list"-like command.
+
