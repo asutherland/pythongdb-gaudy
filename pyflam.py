@@ -19,7 +19,7 @@
 ###  that is explicitly GPL v3 in the first place!  However, this will probably
 ###  still get licensed under something more permissive...
 
-import re, sys
+import re, sys, os.path
         
 class FlamOut(object):
     def __init__(self, fout=None):
@@ -297,10 +297,50 @@ class FlamOut(object):
         self('-' * 40)
 
 class FlamHTML(FlamOut):
-    def __init__(self, fout, style=True):
-        super(FlamHTML, self).__init__(fout)
+    def __init__(self, filename_or_fout, style=True, title=''):
+        super(FlamHTML, self).__init__()
         
         self._style = style
+
+        if isinstance(filename_or_fout, basestring):
+            basename, extname = os.path.splitext(filename_or_fout)
+            self._html_basename_with_path = basename
+            self._html_basename_sans_path = os.path.basename(basename)
+            self._html_extname = extname
+            self.fout = open(filename_or_fout, 'wt')
+            self.write_html_intro(title)
+        else:
+            self.fout = filename_or_fout
+
+        self.title = title
+        self.fstack = []
+        self.indentStack = []
+
+    def linkToPermutation(self, uniqueVal):
+        relpath = '%s-%s%s' % (self._html_basename_sans_path,
+                               uniqueVal,
+                               self._html_extname)
+        self.fout.write('<a href="%s">' % (relpath,))
+
+    def closeLink(self):
+        self.fout.write('</a>')
+
+    def pushFilePermutation(self, uniqueVal):
+        self.fstack.append(self.fout)
+        self.indentStack.append(self._indentLevel)
+
+        path = '%s-%s%s' % (self._html_basename_with_path,
+                            uniqueVal,
+                            self._html_extname)
+
+        self.fout = open(path, 'wt')
+        self._indentLevel = 0
+        self.write_html_intro('%s: %s' % (self.title, uniqueVal))
+
+    def popFilePermutation(self):
+        self.close()
+        self.fout = self.fstack.pop()
+        self._indentLevel = self.indentStack.pop()
 
     _CTYPE_MAP= {'fg': 'color',
                  'bg': 'background-color'}
@@ -313,6 +353,8 @@ class FlamHTML(FlamOut):
                 v = str(args[iarg])
                 state['offset'] = state['offset'] + len(v)
                 state['iarg'] = iarg + 1
+                # HTML escaping here! gah!
+                v = v.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
                 return v
             
             #print m.start(0), m.end(0), m.start(1), m.end(1)
@@ -367,6 +409,8 @@ class FlamHTML(FlamOut):
         self._cmap[name] = ('bg', self._colorcode_to_hex(code))
         
     def write_styles(self):
+        # make the 'n' foreground color the link color
+        self.fout.write('a {color: #%s;}\n' % (self._cmap['n'][1],))
         for key, val in self._cmap.items():
             ctype, cval = val
             
@@ -383,5 +427,10 @@ class FlamHTML(FlamOut):
         
     def write_html_outro(self):
         self.fout.write('</pre></body></html>')
+
+    def close(self):
+        self.write_html_outro()
+        self.fout.close()
+        self.fout = None
 
 pout = FlamOut()

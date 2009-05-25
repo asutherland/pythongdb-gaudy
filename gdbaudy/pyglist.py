@@ -81,7 +81,12 @@ Arguments regardless of context
                 args = map(int, argStr.split(' '))
                 line_range = (sal.line - args[0], sal.line + args[1])
             elif argStr[0] == '-':
-                arg = int(argStr[1:])
+                if len(argStr) == 1:
+                    # XXX uh, this would seem to happen when our context info
+                    #  tricks us into thinking it's a new context, but it's not
+                    arg = 11
+                else:
+                    arg = int(argStr[1:])
                 line_range = (sal.line - arg, sal.line + 8)
             elif argStr[0] == '+':
                 arg = int(argStr[1:])
