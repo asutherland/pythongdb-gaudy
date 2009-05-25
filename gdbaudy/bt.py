@@ -102,7 +102,7 @@ class ColorFrameWrapper:
         self.context = context
         self.frame_num = frame_num
 
-        self.func = gdb.find_pc_function (self.frame.addr_in_block ())
+        self.func = self.frame.function()
 
         sal = self.frame.find_sal()
         if sal.symtab and sal.symtab.filename:
@@ -267,7 +267,7 @@ Use of the 'raw' qualifier avoids any filtering by loadable modules.
         context = ContextHelper()
 
         frames = []
-        iterFrames = FrameIterator (gdb.newest_frame ())
+        iterFrames = FrameIterator (gdb.selected_thread().newest_frame())
         if filter:
             iterFrames = gdb.backtrace.create_frame_filter (iterFrames)
 
