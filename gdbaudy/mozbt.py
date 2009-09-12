@@ -45,9 +45,10 @@ class JSFrame(object):
 
         print 'building frame', self.filename, self.line
 
-        fun = getfield(fp, self.frame_fun)
-        atom = mjs.AtomicjsvalPunPrinter(getfield(fun, self.func_atom))
-        self.func_name = atom.content_string()
+        #fun = getfield(fp, self.frame_fun)
+        #atom = mjs.AtomicjsvalPunPrinter(getfield(fun, self.func_atom))
+        #self.func_name = atom.content_string()
+        self.func_name = 'punted'
         print '  func:', self.func_name
 
 def getfield(addr, fielddef):
