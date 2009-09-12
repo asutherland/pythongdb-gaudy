@@ -47,7 +47,7 @@ def get_js_string_from_atom(atom):
     str_addr = guestload32(flat_str + 4)
     
     inferior = gdb.inferiors()[0]
-    str_data = inferior.read_memory(str_addr, str_len)
+    str_data = str(inferior.read_memory(str_addr, str_len))
     return str_data.decode("utf-16")
 
 class JSFrame(object):
