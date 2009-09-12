@@ -105,7 +105,7 @@ class JSFrameHelper(object):
         self.contexts = {}
 
         cur = contextList
-        contextListAddr = int(contextList)
+        contextListAddr = contextList.address
         while cur['next'] != contextListAddr:
             # get the context
             context_addr = cur.address - self.jscontext_link_offset;
