@@ -105,7 +105,8 @@ class JSFrameHelper(object):
         self.contexts = {}
 
         cur = contextList
-        while cur['next'] != contextList:
+        contextListAddr = int(contextList)
+        while cur['next'] != contextListAddr:
             # get the context
             context_addr = cur.address - self.jscontext_link_offset;
             self.contexts[context_addr] = JSScratchContext(context_addr)
