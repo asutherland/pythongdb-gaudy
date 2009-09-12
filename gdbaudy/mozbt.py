@@ -80,8 +80,11 @@ class JSFrame(object):
         print 'building frame', self.filename, self.line
 
         fun = forceint(getfield(fp, self.frame_fun))
-        atom = forceint(getfield(fun, self.func_atom))
-        self.func_name = get_js_string_from_atom(atom)
+        if fun:
+            atom = forceint(getfield(fun, self.func_atom))
+            self.func_name = get_js_string_from_atom(atom)
+        else:
+            self.func_name = '<none>'
         print '  func:', self.func_name
 
 def forceint(blah):
