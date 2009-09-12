@@ -35,7 +35,8 @@ class JSFrame(object):
     Represents a javascript stack frame.
     '''
     def __init__(self, fp):
-        self.pc = getfield(getfield(fp, self.frame_regs), self.regs_pc)
+        regs = int(str(getfield(fp, self.frame_regs), 16))
+        self.pc = getfield(regs, self.regs_pc)
 
         script = getfield(fp, self.frame_script)
         filename_str = getfield(script, self.script_filename)
@@ -52,11 +53,11 @@ class JSFrame(object):
         print '  func:', self.func_name
 
 def getfield(addr, fielddef):
-    print fielddef.type
-    print ':', addr
+    #print fielddef.type
+    #print ':', addr
     evalstr = "(%s) *0x%x" % (fielddef.type,
                               addr + fielddef.bitpos / 8)
-    print 'evaluating', evalstr
+    #print 'evaluating', evalstr
     return gdb.parse_and_eval(evalstr)
 
 class JSScratchContext(object):
