@@ -326,8 +326,6 @@ class MozBT(gdb.Command):
     Mozilla Backtrace!
     """
     def __init__ (self):
-        # FIXME: this is not working quite well enough to replace
-        # "backtrace" yet.
         gdb.Command.__init__ (self, "mbt", gdb.COMMAND_STACK)
 
     def invoke (self, arg, from_tty):

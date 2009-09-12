@@ -273,8 +273,6 @@ Use of the 'raw' qualifier avoids any filtering by loadable modules.
 """
 
     def __init__ (self):
-        # FIXME: this is not working quite well enough to replace
-        # "backtrace" yet.
         gdb.Command.__init__ (self, "cbt", gdb.COMMAND_STACK)
         self.reverse = gdb.command.backtrace.ReverseBacktraceParameter()
 
