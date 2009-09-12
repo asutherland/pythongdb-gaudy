@@ -86,6 +86,16 @@ class JSScratchContext(object):
         self.dormantFrameChain = forceint(
             getfield(self.fp, self.frame_dormantNext))
 
+    def hackRestore(self):
+        '''
+        Hack to deal with XPCJSContextStack where it has saved the frame off
+        heuristically rather than properly maintaining that as its own context
+        construct.
+        '''
+        # if we have no fp, then restore
+        if self.fp == 0:
+            self.restoreDormantChain()
+
     def popUntilFrame(self, syn_frames, bp, prev_bp):
         '''
         Keep popping frames off this context (and generating synthetic frames)
@@ -105,6 +115,8 @@ class JSFrameHelper(object):
     jsinterp = get_func_block("js_Interpret")
     jsexec = get_func_block("js_Execute")
     jsinvoke = get_func_block("js_Invoke")
+
+    xpcmethod = get_func_block("XPC_WN_CallMethod")
 
     jscontext_link_offset = offset("JSContext", "link")
 
@@ -192,6 +204,11 @@ class JSFrameHelper(object):
             #  oldfp->dormantNext.  This means that when we encouter js_Execute,
             #  we want to reverse this operation.
             scx.restoreDormantChain()
+        elif (pc >= self.xpc_wn_callmethod.start and
+                  pc <= self.xpc_wn_callmethod.end):
+            # we should probably be traversing the XPCJSContextStack
+            #  concurrently
+            scx.hackRestore()
 
         return syn_frames, show_me
             
