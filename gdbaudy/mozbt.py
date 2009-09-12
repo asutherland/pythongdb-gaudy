@@ -56,11 +56,11 @@ def forceint(blah):
     return int(str(blah), 16)
 
 def getfield(addr, fielddef):
-    print fielddef.type
-    print ':', addr
+    #print fielddef.type
+    #print ':', addr
     evalstr = "(%s) *0x%x" % (fielddef.type,
                               addr + fielddef.bitpos / 8)
-    print 'evaluating', evalstr
+    #print 'evaluating', evalstr
     return gdb.parse_and_eval(evalstr)
 
 class JSScratchContext(object):
@@ -93,6 +93,7 @@ class JSScratchContext(object):
         prev_bp.  bp > prev_bp
         '''
         while self.fp > bp or prev_bp > self.fp:
+            print 'fp: ', fp, 'bp', bp, 'prev_bp', prev_bp
             if self.fp == 0:
                 raise Exception('We should have a frame!')
             syn_frames.append(JSFrame(self.fp))
