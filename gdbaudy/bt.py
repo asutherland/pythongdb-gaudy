@@ -27,11 +27,15 @@ from pyflam import *
 import sys
 import os.path
 
-class ContextHelper:
-    def __init__(self):
+class ContextHelper(object):
+    def __init__(self, frameHelpers=[]):
         self.pathCounts = {}
         self.seenValues = {}
         self.interestingValues = {}
+
+        self.frameHelpers = frameHelpers
+        for frameHelper in self.frameHelpers:
+            frameHelper.setup()
 
     def considerPath(self, path):
         # screw escaping
@@ -94,9 +98,23 @@ class ContextHelper:
         info = self.interestingValues[value]
         return info['name'], info['colorName']
 
+    def runHelpers(self, frame):
+        syn_frames = None
+        show = True
+        for frameHelper in self.frameHelpers:
+            helper_frames, helper_show = frameHelper.process_frame(frame)
+            if not helper_show:
+                show = False
+            if helper_frames:
+                syn_frames = helper_frames
+        return syn_frames, show
+
 
 # This comes from gdb.command.backtrace, hence the copyright up top
-class ColorFrameWrapper:
+class ColorFrameWrapper(object):
+    '''
+    Wraps a frame.
+    '''
     def __init__ (self, frame, context, frame_num):
         self.frame = frame;
         self.context = context
@@ -104,22 +122,37 @@ class ColorFrameWrapper:
 
         self.func = self.frame.function()
 
+        # -- Tell the context about the file path
+        # symtab and line
         sal = self.frame.find_sal()
         if sal.symtab and sal.symtab.filename:
             self.context.considerPath(sal.symtab.filename)
         
+        # -- Tell the function about all the values it sees (args and locals)
         if self.func:
             for sym in self.func.value:
                 self.context.considerValue(
                     self.frame_num,
                     *self.munge_symbol(sym, self.func.value))
 
+        self.syn_frames, self.show_me = self.context.runHelpers(self.frame)
+
     def munge_symbol (self, sym, block):
+        '''
+        Given a symbol in the context of a block, return a tuple of the printable
+        name for the symbol and its value in this frame.
+
+        @param sym A symbol, probably either an argument or a local.
+        @param block The frame block in which we are operating.
+        '''
+        # uh, pierce linkage names unless they are register values?
+        #  maybe this is a trick to get the fully qualified type?
         if len (sym.linkage_name):
             nsym, is_field_of_this = gdb.lookup_symbol (sym.linkage_name, block)
             if nsym.addr_class != gdb.SYMBOL_LOC_REGISTER:
                 sym = nsym
 
+        # load the value!
         try:
             val = self.frame.read_var (sym)
             if val != None:
@@ -133,12 +166,12 @@ class ColorFrameWrapper:
             val = "???"
         return sym.print_name, val
 
-    def print_frame_locals (self, func):
-        if not func:
+    def print_frame_locals (self, func_sym):
+        if not func_sym:
             return
 
         first = True
-        block = func.value
+        block = func_sym.value
 
         fmtbits = []
         fmtvals = []
@@ -159,12 +192,12 @@ class ColorFrameWrapper:
 
         pout('\n'.join(fmtbits), *fmtvals)
 
-    def print_frame_args (self, func):
-        if not func:
+    def print_frame_args (self, func_sym):
+        if not func_sym:
             return
 
         first = True
-        block = func.value
+        block = func_sym.value
 
         fmtbits = []
         fmtvals = []
@@ -189,6 +222,17 @@ class ColorFrameWrapper:
     # FIXME: this should probably just be a method on gdb.Frame.
     # But then we need stream wrappers.
     def describe (self, frame_num, full):
+        if self.syn_frames:
+            for syn_frame in self.syn_frames:
+                pout('{s}JS {ln}%08x {s}in {fn}%s {s}at {cn}%s{s}:{ln}%d{-fg}',
+                     syn_frame.pc, syn_frame.func_name,
+                     syn_frame.filename,
+                     #self.context.chewPath(syn_frame.filename) or '???',
+                     syn_frame.line)
+
+        if not self.show_me:
+            return
+
         if self.frame.type () == gdb.DUMMY_FRAME:
             pout('{s}%2.2d <function called from gdb>{-fg}', frame_num)
         elif self.frame.type () == gdb.SIGTRAMP_FRAME:
@@ -294,4 +338,4 @@ Use of the 'raw' qualifier avoids any filtering by loadable modules.
         for pair in iterFrames:
             pair[1].describe (pair[0], full)
 
-ColorFilteringBacktrace()
+#ColorFilteringBacktrace()
