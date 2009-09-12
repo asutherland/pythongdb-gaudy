@@ -20,7 +20,7 @@ def get_field_def(typeName, fieldName):
                     (typeName, fieldName))
 
 def offset(typeName, fieldName):
-    return get_field_def(typeName, fieldName).bitpos / 8
+    return int(get_field_def(typeName, fieldName).bitpos) / 8
 
 class JSFrame(object):
     frame_regs = get_field_def("JSStackFrame", "regs")
@@ -50,9 +50,9 @@ class JSFrame(object):
         print '  func:', self.func_name
 
 def getfield(addr, fielddef):
-    print 'getfield', int(addr), fielddef, fielddef.bitpos
-    return gdb.parse_and_eval("(%s) *0x%x" % (str(fielddef.type),
-                                              int(addr) + fielddef.bitpos / 8))
+    print 'getfield', addr, fielddef, fielddef.bitpos
+    return gdb.parse_and_eval("(%s) *0x%x" % (fielddef.type,
+                                              addr + fielddef.bitpos / 8))
 
 class JSScratchContext(object):
     cx_fp = get_field_def("JSContext", "fp")
@@ -109,7 +109,7 @@ class JSFrameHelper(object):
         contextListAddr = contextList.address
         while cur['next'] != contextListAddr:
             # get the context
-            context_addr = cur.address - self.jscontext_link_offset;
+            context_addr = int(cur.address) - self.jscontext_link_offset
             self.contexts[context_addr] = JSScratchContext(context_addr)
             cur = cur['next'].dereference()
 
