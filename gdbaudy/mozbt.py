@@ -154,6 +154,10 @@ class JSScratchContext(object):
         prev_bp.  bp > prev_bp
         '''
         done = False
+        if self.fp == 0 and self.dormantFrameChain:
+            print '  @@ compelling restore based on heuristic'
+            self.restoreDormantChain()
+
         while not done:
             if self.fp == 0:
                 raise Exception('We should have a frame!')
@@ -263,10 +267,11 @@ class JSFrameHelper(object):
             print '*** xpc method'
             # we should probably be traversing the XPCJSContextStack
             #  concurrently
-            scx = self._get_scx_for_frame(frame)
-            scx.hackRestore()
+            ### trying out heuristics...
+            ##scx = self._get_scx_for_frame(frame)
+            ##scx.hackRestore()
 
-            show_me = False
+            ##show_me = False
         # consider suppressing this dude for reasons of boring-osity
         else:
             func_name = frame.name()
