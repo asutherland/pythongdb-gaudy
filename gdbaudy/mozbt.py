@@ -34,7 +34,7 @@ def norm_js_path(path):
     return os.path.split(path)[1]
 
 def guestload32(addr):
-    return int(gdb.parse_and_eval("int *0x%x" % (addr,)))
+    return int(gdb.parse_and_eval("*(int *)0x%x" % (addr,)))
 
 def get_js_string_from_atom(atom):
     if atom == 0:
