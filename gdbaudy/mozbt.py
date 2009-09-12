@@ -204,8 +204,8 @@ class JSFrameHelper(object):
             #  oldfp->dormantNext.  This means that when we encouter js_Execute,
             #  we want to reverse this operation.
             scx.restoreDormantChain()
-        elif (pc >= self.xpc_wn_callmethod.start and
-                  pc <= self.xpc_wn_callmethod.end):
+        elif (pc >= self.xpcmethod.start and
+                  pc <= self.xpcmethod.end):
             # we should probably be traversing the XPCJSContextStack
             #  concurrently
             scx.hackRestore()
