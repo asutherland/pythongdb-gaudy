@@ -1,8 +1,18 @@
+# Prototype mozilla backtrace functionality that unifies JavaScript and C++
+#  call stacks.
+#
+# Andrew Sutherland <asutherland@asutherland.org>
+
+# Depends on our bt.py, which is GPL 3 or later, so we are GPL 3 or later.
+
 import gdb, gdb.backtrace
 from gdb.FrameIterator import FrameIterator
 import gdbaudy.bt as gbt
 import itertools
 import os.path
+
+## Very regrettably, our abuse of converting through string representations
+##  requires that mozilla.js not be used.  Some day, we might fix this.
 
 #import mozilla.js as mjs
 
@@ -268,7 +278,8 @@ class JSFrameHelper(object):
                 show_me = False
             # XPConnect internals are not interesting
             elif (func_name.startswith("XPC") or
-                  func_name.startswith("xpc_")):
+                  func_name.startswith("xpc_") or
+                  func_name.startswith("nsXPCWrapped")):
                 show_me = False
             elif (func_name == "PrepareAndDispatch" or
                   func_name == "NS_InvokeByIndex_P"):
