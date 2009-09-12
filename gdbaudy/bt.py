@@ -221,7 +221,7 @@ class ColorFrameWrapper(object):
 
     # FIXME: this should probably just be a method on gdb.Frame.
     # But then we need stream wrappers.
-    def describe (self, frame_num, full):
+    def describe (self, frame_num, full, args=True):
         if self.syn_frames:
             for syn_frame in self.syn_frames:
                 pout('{s}JS {ln}%08x {s}in {fn}%s {s}at {cn}%s{s}:{ln}%d{-fg}',
@@ -255,7 +255,8 @@ class ColorFrameWrapper(object):
                  sal.symtab and sal.symtab.filename and self.context.chewPath(sal.symtab.filename) or '???',
                  sal.line)
             pout.i(2)
-            self.print_frame_args(self.func)
+            if args:
+                self.print_frame_args(self.func)
 
             if full:
                 self.print_frame_locals (self.func)

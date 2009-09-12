@@ -2,6 +2,7 @@ import gdb, gdb.backtrace
 from gdb.FrameIterator import FrameIterator
 import gdbaudy.bt as gbt
 import itertools
+import os.path
 
 #import mozilla.js as mjs
 
@@ -22,6 +23,32 @@ def get_field_def(typeName, fieldName):
 
 def offset(typeName, fieldName):
     return int(get_field_def(typeName, fieldName).bitpos) / 8
+
+def norm_js_path(path):
+    # pass chrome paths through intact
+    if path.startswith("chrome://"):
+        return path
+    # eat the beginning of file URLs
+    if path.startswith("file://"):
+        path = path[7:]
+    return os.path.split(path)[1]
+
+def guestload32(addr):
+    return int(gdb.parse_and_eval("int *0x%x" % (addr,)))
+
+def get_js_string_from_atom(atom):
+    if atom == 0:
+        return '<none>'
+    # er, we could pull from the struct but I'm cribbing from
+    #  jsstack.emt at this point since we really should just be using
+    #  archer-mozilla...
+    flat_str = guestload32(atom & 0xfffffff8)
+    str_len = guestload32(flat_str) & 0xff
+    str_addr = guestload32(flat_str + 4)
+    
+    inferior = gdb.inferiors[0]
+    str_data = inferior.read_memory(str_addr, str_len)
+    return str_data.decode("utf-16")
 
 class JSFrame(object):
     frame_regs = get_field_def("JSStackFrame", "regs")
@@ -44,7 +71,7 @@ class JSFrame(object):
         script = forceint(getfield(fp, self.frame_script))
         if script:
             filename_str = getfield(script, self.script_filename)
-            self.filename = filename_str.string()
+            self.filename = norm_js_path(filename_str.string())
             self.line = getfield(script, self.script_lineno)
         else:
             self.filename = '<none>'
@@ -52,10 +79,9 @@ class JSFrame(object):
 
         print 'building frame', self.filename, self.line
 
-        #fun = getfield(fp, self.frame_fun)
-        #atom = mjs.AtomicjsvalPunPrinter(getfield(fun, self.func_atom))
-        #self.func_name = atom.content_string()
-        self.func_name = 'punted'
+        fun = forceint(getfield(fp, self.frame_fun))
+        atom = forceint(getfield(fun, self.func_atom))
+        self.func_name = get_js_string_from_atom(atom)
         print '  func:', self.func_name
 
 def forceint(blah):
@@ -224,6 +250,24 @@ class JSFrameHelper(object):
             scx = self._get_scx_for_frame(frame)
             scx.hackRestore()
 
+            show_me = False
+        # consider suppressing this dude for reasons of boring-osity
+        else:
+            func_name = frame.name()
+            if not func_name:
+                pass
+            # JS internal APIs are not interesting
+            elif (func_name.startswith("js_") or
+                  func_name.startswith("JS_")):
+                show_me = False
+            # XPConnect internals are not interesting
+            elif (func_name.startswith("XPC") or
+                  func_name.startswith("xpc_")):
+                show_me = False
+            elif (func_name == "PrepareAndDispatch" or
+                  func_name == "NS_InvokeByIndex_P"):
+                show_me = False
+            
         return syn_frames, show_me
             
 
@@ -253,4 +297,4 @@ def mozbt():
         # zero it...
         pout.i(-100)
         for pair in iterFrames:
-            pair[1].describe (pair[0], False)
+            pair[1].describe (pair[0], False, False)
