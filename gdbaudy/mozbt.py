@@ -82,9 +82,12 @@ class JSScratchContext(object):
             getfield(addr, self.cx_dormantFrameChain))
 
     def restoreDormantChain(self):
+        print '!!! restore chain'
+        print '  before fp:', self.fp, 'dormant', self.dormantFrameChain
         self.fp = self.dormantFrameChain
         self.dormantFrameChain = forceint(
             getfield(self.fp, self.frame_dormantNext))
+        print '  after fp:', self.fp, 'dormant', self.dormantFrameChain
 
     def hackRestore(self):
         '''
@@ -206,6 +209,7 @@ class JSFrameHelper(object):
             scx.restoreDormantChain()
         elif (pc >= self.xpcmethod.start and
                   pc <= self.xpcmethod.end):
+            print '*** xpc method'
             # we should probably be traversing the XPCJSContextStack
             #  concurrently
             scx = self._get_scx_for_frame(frame)
