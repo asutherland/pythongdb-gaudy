@@ -43,7 +43,7 @@ def get_js_string_from_atom(atom):
     #  jsstack.emt at this point since we really should just be using
     #  archer-mozilla...
     flat_str = atom & 0xfffffff8
-    str_len = guestload32(flat_str) & 0xff
+    str_len = (guestload32(flat_str) & 0xff) * 2
     str_addr = guestload32(flat_str + 4)
     
     inferior = gdb.inferiors()[0]
