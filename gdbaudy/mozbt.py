@@ -92,11 +92,13 @@ class JSScratchContext(object):
         until we find a frame whose address is in the range defined by bp and
         prev_bp.  bp > prev_bp
         '''
-        while self.fp > bp or prev_bp > self.fp:
-            print 'fp: ', self.fp, 'bp', bp, 'prev_bp', prev_bp
+        done = False
+        while not done:
             if self.fp == 0:
                 raise Exception('We should have a frame!')
             syn_frames.append(JSFrame(self.fp))
+            done = bp <= self.fp and self.fp >= prev_bp
+            print 'fp: ', self.fp, 'bp', bp, 'prev_bp', prev_bp, 'done', done
             self.fp = forceint(getfield(self.fp, self.frame_down))
 
 class JSFrameHelper(object):
