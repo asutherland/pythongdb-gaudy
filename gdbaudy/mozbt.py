@@ -47,7 +47,7 @@ class JSFrame(object):
             self.filename = filename_str.string()
             self.line = getfield(script, self.script_lineno)
         else:
-            self.filanem = '<none>'
+            self.filename = '<none>'
             self.line = 0
 
         print 'building frame', self.filename, self.line
