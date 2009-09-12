@@ -194,7 +194,7 @@ class JSFrameHelper(object):
 
         elif pc >= self.jsexec.start and pc <= self.jsexec.end:
             print '*** exec'
-            cx = frame.read_var("cx")
+            scx = self._get_scx_for_frame(frame)
             # there is a local 'frame' variable
             scx.popUntilFrame(syn_frames, bp, prev_bp)
             show_me = False
@@ -208,6 +208,7 @@ class JSFrameHelper(object):
                   pc <= self.xpcmethod.end):
             # we should probably be traversing the XPCJSContextStack
             #  concurrently
+            scx = self._get_scx_for_frame(frame)
             scx.hackRestore()
 
         return syn_frames, show_me
