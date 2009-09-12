@@ -91,8 +91,11 @@ class JSScratchContext(object):
         print '!!! restore chain'
         print '  before fp:', self.fp, 'dormant', self.dormantFrameChain
         self.fp = self.dormantFrameChain
-        self.dormantFrameChain = forceint(
-            getfield(self.fp, self.frame_dormantNext))
+        if self.fp:
+            self.dormantFrameChain = forceint(
+                getfield(self.fp, self.frame_dormantNext))
+        else:
+            self.dormantFrameChain = 0
         print '  after fp:', self.fp, 'dormant', self.dormantFrameChain
 
     def hackRestore(self):
