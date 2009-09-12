@@ -109,7 +109,9 @@ class JSFrameHelper(object):
         contextListAddr = contextList.address
         while cur['next'] != contextListAddr:
             # get the context
-            context_addr = int(cur.address) - self.jscontext_link_offset
+            # force the address into integer space through being a string
+            #  since gdb.Value won't let us directly coerce
+            context_addr = int(str(cur.address), 16) - self.jscontext_link_offset
             self.contexts[context_addr] = JSScratchContext(context_addr)
             cur = cur['next'].dereference()
 
