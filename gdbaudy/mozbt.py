@@ -54,6 +54,7 @@ class JSFrame(object):
 def getfield(addr, fielddef):
     evalstr = "(%s) *0x%x" % (fielddef.type,
                               addr + fielddef.bitpos / 8)
+    print 'evaluating', evalstr, addr, fielddef.bitpos
     return gdb.parse_and_eval(evalstr)
 
 class JSScratchContext(object):
