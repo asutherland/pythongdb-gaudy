@@ -3,7 +3,7 @@ from gdb.FrameIterator import FrameIterator
 import gdbaudy.bt as gbt
 import itertools
 
-import mozilla.js as mjs
+#import mozilla.js as mjs
 
 pout = gbt.pout
 
@@ -131,7 +131,7 @@ class JSFrameHelper(object):
         return int(frame_str[7:frame_str.find(",")], 16) - 8
 
     def _get_scx_for_frame(self, frame):
-        cx_addr = int(frame.read_var("cx"))
+        cx_addr = int(str(frame.read_var("cx")))
         return self.contexts[cx_addr]
 
     def process_frame(self, frame):
