@@ -97,7 +97,7 @@ class JSScratchContext(object):
             if self.fp == 0:
                 raise Exception('We should have a frame!')
             syn_frames.append(JSFrame(self.fp))
-            done = bp <= self.fp and self.fp >= prev_bp
+            done = bp >= self.fp and self.fp >= prev_bp
             print 'fp: ', self.fp, 'bp', bp, 'prev_bp', prev_bp, 'done', done
             self.fp = forceint(getfield(self.fp, self.frame_down))
 
