@@ -42,10 +42,13 @@ class JSFrame(object):
             self.pc = 0
 
         script = forceint(getfield(fp, self.frame_script))
-        filename_str = getfield(script, self.script_filename)
-
-        self.filename = filename_str.string()
-        self.line = getfield(script, self.script_lineno)
+        if script:
+            filename_str = getfield(script, self.script_filename)
+            self.filename = filename_str.string()
+            self.line = getfield(script, self.script_lineno)
+        else:
+            self.filanem = '<none>'
+            self.line = 0
 
         print 'building frame', self.filename, self.line
 
