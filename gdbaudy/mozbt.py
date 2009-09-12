@@ -36,7 +36,10 @@ class JSFrame(object):
     '''
     def __init__(self, fp):
         regs = forceint(getfield(fp, self.frame_regs))
-        self.pc = getfield(regs, self.regs_pc)
+        if regs:
+            self.pc = getfield(regs, self.regs_pc)
+        else:
+            self.pc = 0
 
         script = forceint(getfield(fp, self.frame_script))
         filename_str = getfield(script, self.script_filename)
