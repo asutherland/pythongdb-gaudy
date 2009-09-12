@@ -35,10 +35,10 @@ class JSFrame(object):
     Represents a javascript stack frame.
     '''
     def __init__(self, fp):
-        regs = int(str(getfield(fp, self.frame_regs), 16))
+        regs = forceint(getfield(fp, self.frame_regs))
         self.pc = getfield(regs, self.regs_pc)
 
-        script = getfield(fp, self.frame_script)
+        script = forceint(getfield(fp, self.frame_script))
         filename_str = getfield(script, self.script_filename)
 
         self.filename = filename_str.string()
@@ -52,12 +52,15 @@ class JSFrame(object):
         self.func_name = 'punted'
         print '  func:', self.func_name
 
+def forceint(blah):
+    return int(str(blah), 16)
+
 def getfield(addr, fielddef):
-    #print fielddef.type
-    #print ':', addr
+    print fielddef.type
+    print ':', addr
     evalstr = "(%s) *0x%x" % (fielddef.type,
                               addr + fielddef.bitpos / 8)
-    #print 'evaluating', evalstr
+    print 'evaluating', evalstr
     return gdb.parse_and_eval(evalstr)
 
 class JSScratchContext(object):
