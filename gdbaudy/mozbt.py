@@ -42,7 +42,7 @@ def get_js_string_from_atom(atom):
     # er, we could pull from the struct but I'm cribbing from
     #  jsstack.emt at this point since we really should just be using
     #  archer-mozilla...
-    flat_str = guestload32(atom & 0xfffffff8)
+    flat_str = atom & 0xfffffff8
     str_len = guestload32(flat_str) & 0xff
     str_addr = guestload32(flat_str + 4)
     
