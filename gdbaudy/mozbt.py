@@ -96,7 +96,7 @@ class JSFrameHelper(object):
     def __init__(self):
         pass
 
-    def _chew_context_list(contextList):
+    def _chew_context_list(self, contextList):
         '''
         Given a JSCList contextList of JSContexts,
 
