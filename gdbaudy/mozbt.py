@@ -168,6 +168,7 @@ class JSFrameHelper(object):
             show_me = False
 
         elif pc >= self.jsinvoke.start and pc <= self.jsinvoke.end:
+            print 'invoke'
             scx = self._get_scx_for_frame(frame)
             # there is a locale frame variable, pop until we get to it
             scx.popUntilFrame(syn_frames, bp, prev_bp)
@@ -177,6 +178,7 @@ class JSFrameHelper(object):
             pass
 
         elif pc >= self.jsexec.start and pc <= self.jsexec.end:
+            print 'exec'
             cx = frame.read_var("cx")
             # there is a local 'frame' variable
             scx.popUntilFrame(syn_frames, bp, prev_bp)
