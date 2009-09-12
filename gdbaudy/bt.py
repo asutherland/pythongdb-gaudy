@@ -224,7 +224,7 @@ class ColorFrameWrapper(object):
     def describe (self, frame_num, full, args=True):
         if self.syn_frames:
             for syn_frame in self.syn_frames:
-                pout('{s}JS {ln}%08x {s}in {fn}%s {s}at {cn}%s{s}:{ln}%d{-fg}',
+                pout('{s}JS {ln}%010x {s}in {fn}%s {s}at {cn}%s{s}:{ln}%d{-fg}',
                      syn_frame.pc, syn_frame.func_name,
                      syn_frame.filename,
                      #self.context.chewPath(syn_frame.filename) or '???',
@@ -250,7 +250,7 @@ class ColorFrameWrapper(object):
                     # stream.write (" from " + lib)
                     pass
 
-            pout('{s}%2.2d {ln}%08x {s}in {fn}%s {s}at {cn}%s{s}:{ln}%d{-fg}',
+            pout('{s}%2.2d {ln}%010x {s}in {fn}%s {s}at {cn}%s{s}:{ln}%d{-fg}',
                  frame_num, pc, name,
                  sal.symtab and sal.symtab.filename and self.context.chewPath(sal.symtab.filename) or '???',
                  sal.line)
