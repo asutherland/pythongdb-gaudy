@@ -249,10 +249,6 @@ def mozbt():
 
         # Extract sub-range user wants.
         iterFrames = itertools.izip (itertools.count (0), iter(frames))
-        if count < 0:
-            iterFrames = self.final_n (iterFrames, count)
-        elif count > 0:
-            iterFrames = itertools.islice (iterFrames, 0, count)
 
         # zero it...
         pout.i(-100)
