@@ -271,7 +271,7 @@ class JSFrameHelper(object):
             ##scx = self._get_scx_for_frame(frame)
             ##scx.hackRestore()
 
-            ##show_me = False
+            show_me = False
         # consider suppressing this dude for reasons of boring-osity
         else:
             func_name = frame.name()
