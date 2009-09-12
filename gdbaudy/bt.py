@@ -224,7 +224,7 @@ class ColorFrameWrapper(object):
     def describe (self, frame_num, full, args=True):
         if self.syn_frames:
             for syn_frame in self.syn_frames:
-                pout('{s}JS {ln}%010x {s}in {fn}%s {s}at {cn}%s{s}:{ln}%d{-fg}',
+                pout('{s}JS {ln}%010x {s}in {jfn}%s {s}at {cn}%s{s}:{ln}%d{-fg}',
                      syn_frame.pc, syn_frame.func_name,
                      syn_frame.filename,
                      #self.context.chewPath(syn_frame.filename) or '???',

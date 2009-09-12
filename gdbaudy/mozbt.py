@@ -36,9 +36,9 @@ def norm_js_path(path):
 def guestload32(addr):
     return int(gdb.parse_and_eval("*(int *)0x%x" % (addr,)))
 
-def get_js_string_from_atom(atom):
+def get_js_string_from_atom(atom, default):
     if atom == 0:
-        return '<none>'
+        return default
     # er, we could pull from the struct but I'm cribbing from
     #  jsstack.emt at this point since we really should just be using
     #  archer-mozilla...
@@ -82,9 +82,9 @@ class JSFrame(object):
         fun = forceint(getfield(fp, self.frame_fun))
         if fun:
             atom = forceint(getfield(fun, self.func_atom))
-            self.func_name = get_js_string_from_atom(atom)
+            self.func_name = get_js_string_from_atom(atom, '<anon>')
         else:
-            self.func_name = '<none>'
+            self.func_name = '<anon>'
         print '  func:', self.func_name
 
 def forceint(blah):
@@ -147,7 +147,10 @@ class JSScratchContext(object):
         while not done:
             if self.fp == 0:
                 raise Exception('We should have a frame!')
-            syn_frames.append(JSFrame(self.fp))
+            jsframe = JSFrame(self.fp)
+            # ignore dummy native frames
+            if jsframe.pc:
+                syn_frames.append(jsframe)
             done = bp >= self.fp and self.fp >= prev_bp
             print 'fp: ', self.fp, 'bp', bp, 'prev_bp', prev_bp, 'done', done
             self.fp = forceint(getfield(self.fp, self.frame_down))
