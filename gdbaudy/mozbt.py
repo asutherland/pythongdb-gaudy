@@ -50,7 +50,7 @@ class JSFrame(object):
         print '  func:', self.func_name
 
 def getfield(addr, fielddef):
-    return gdb.parse_and_eval("(%s) *%x" % (fielddef.type.name,
+    return gdb.parse_and_eval("(%s) *%x" % (fielddef.type.tag,
                                            addr + fielddef.bitpos / 8))
 
 class JSScratchContext(object):
