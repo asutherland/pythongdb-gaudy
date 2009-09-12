@@ -77,12 +77,14 @@ class JSScratchContext(object):
         '''
         Suck up the current state of the context (that we care about).
         '''
-        self.fp = getfield(addr, self.cx_fp)
-        self.dormantFrameChain = getfield(addr, self.cx_dormantFrameChain)
+        self.fp = forceint(getfield(addr, self.cx_fp))
+        self.dormantFrameChain = forceint(
+            getfield(addr, self.cx_dormantFrameChain))
 
     def restoreDormantChain(self):
         self.fp = self.dormantFrameChain
-        self.dormantFrameChain = getfield(self.fp, self.frame_dormantNext)
+        self.dormantFrameChain = forceint(
+            getfield(self.fp, self.frame_dormantNext))
 
     def popUntilFrame(self, syn_frames, bp, prev_bp):
         '''
@@ -94,7 +96,7 @@ class JSScratchContext(object):
             if self.fp == 0:
                 raise Exception('We should have a frame!')
             syn_frames.append(JSFrame(self.fp))
-            self.fp = getfield(self.fp, self.frame_down)
+            self.fp = forceint(getfield(self.fp, self.frame_down))
 
 class JSFrameHelper(object):
     jsinterp = get_func_block("js_Interpret")
