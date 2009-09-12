@@ -339,4 +339,4 @@ Use of the 'raw' qualifier avoids any filtering by loadable modules.
         for pair in iterFrames:
             pair[1].describe (pair[0], full)
 
-#ColorFilteringBacktrace()
+ColorFilteringBacktrace()
