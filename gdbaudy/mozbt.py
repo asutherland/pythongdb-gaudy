@@ -93,7 +93,7 @@ class JSScratchContext(object):
         prev_bp.  bp > prev_bp
         '''
         while self.fp > bp or prev_bp > self.fp:
-            print 'fp: ', fp, 'bp', bp, 'prev_bp', prev_bp
+            print 'fp: ', self.fp, 'bp', bp, 'prev_bp', prev_bp
             if self.fp == 0:
                 raise Exception('We should have a frame!')
             syn_frames.append(JSFrame(self.fp))
