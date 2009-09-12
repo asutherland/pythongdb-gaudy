@@ -52,6 +52,8 @@ class JSFrame(object):
         print '  func:', self.func_name
 
 def getfield(addr, fielddef):
+    print fielddef.type
+    print ':', addr
     evalstr = "(%s) *0x%x" % (fielddef.type,
                               addr + fielddef.bitpos / 8)
     print 'evaluating', evalstr
