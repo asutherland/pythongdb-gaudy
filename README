@@ -7,9 +7,12 @@ python sys.path[0:0] = ["/path/to/pythongdb-gaudy/"]
 python import gdbaudy.bt
 # syntax-highlighting source list, needs pygments
 python import gdbaudy.pyglist
+# mozilla backtrace...
+python import gdbaudy.mozbt
 ### STOP CUTTING HERE ###
 
 Then you can use:
 - "cbt" as an awesome colorized backtrace
 - "sl" as an awesome colorized / syntax highlighting "list"-like command.
-
+- "mbt" as a colorized fused C++/JS mozilla-specific backtrace that may or may
+   not work.
