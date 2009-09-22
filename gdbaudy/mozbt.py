@@ -46,15 +46,31 @@ def norm_js_path(path):
 def guestload32(addr):
     return int(gdb.parse_and_eval("*(int *)0x%x" % (addr,)))
 
+def guestload64(addr):
+    return int(gdb.parse_and_eval("*(long *)0x%x" % (addr,)))
+
+platform32 = None
+def platform_is_32bit():
+    global platform32
+    if platform32 is None:
+        platform32 = gdb.lookup_type("int").reference().sizeof == 4
+    return platform32
+
+
 def get_js_string_from_atom(atom, default):
     if atom == 0:
         return default
     # er, we could pull from the struct but I'm cribbing from
     #  jsstack.emt at this point since we really should just be using
     #  archer-mozilla...
-    flat_str = atom & 0xfffffff8
-    str_len = (guestload32(flat_str) & 0xff) * 2
-    str_addr = guestload32(flat_str + 4)
+    if platform_is_32bit():
+        flat_str = atom & 0xfffffff8
+        str_len = (guestload32(flat_str) & 0xff) * 2
+        str_addr = guestload32(flat_str + 4)
+    else:
+        flat_str = atom & 0xfffffffffffffff8
+        str_len = (guestload64(flat_str) & 0xff) * 2
+        str_addr = guestload64(flat_str + 8)
     
     inferior = gdb.inferiors()[0]
     str_data = str(inferior.read_memory(str_addr, str_len))
@@ -87,7 +103,7 @@ class JSFrame(object):
             self.filename = '<none>'
             self.line = 0
 
-        print 'building frame', self.filename, self.line
+        #print 'building frame', self.filename, self.line
 
         fun = forceint(getfield(fp, self.frame_fun))
         if fun:
@@ -95,7 +111,7 @@ class JSFrame(object):
             self.func_name = get_js_string_from_atom(atom, '<anon>')
         else:
             self.func_name = '<anon>'
-        print '  func:', self.func_name
+        #print '  func:', self.func_name
 
 def forceint(blah):
     return int(str(blah), 16)
@@ -103,7 +119,7 @@ def forceint(blah):
 def getfield(addr, fielddef):
     #print fielddef.type
     #print ':', addr
-    evalstr = "(%s) *0x%x" % (fielddef.type,
+    evalstr = "*(%s*) 0x%x" % (fielddef.type,
                               addr + fielddef.bitpos / 8)
     #print 'evaluating', evalstr
     return gdb.parse_and_eval(evalstr)
@@ -127,15 +143,15 @@ class JSScratchContext(object):
             getfield(addr, self.cx_dormantFrameChain))
 
     def restoreDormantChain(self):
-        print '!!! restore chain'
-        print '  before fp:', self.fp, 'dormant', self.dormantFrameChain
+        #print '!!! restore chain'
+        #print '  before fp:', self.fp, 'dormant', self.dormantFrameChain
         self.fp = self.dormantFrameChain
         if self.fp:
             self.dormantFrameChain = forceint(
                 getfield(self.fp, self.frame_dormantNext))
         else:
             self.dormantFrameChain = 0
-        print '  after fp:', self.fp, 'dormant', self.dormantFrameChain
+        #print '  after fp:', self.fp, 'dormant', self.dormantFrameChain
 
     def hackRestore(self):
         '''
@@ -153,20 +169,22 @@ class JSScratchContext(object):
         until we find a frame whose address is in the range defined by bp and
         prev_bp.  bp > prev_bp
         '''
+        #print 'bp: %x prev_bp: %x' % (bp, prev_bp)
         done = False
         if self.fp == 0 and self.dormantFrameChain:
-            print '  @@ compelling restore based on heuristic'
+            #print '  @@ compelling restore based on heuristic'
             self.restoreDormantChain()
 
         while not done:
             if self.fp == 0:
                 raise Exception('We should have a frame!')
+            #print 'fp: %x' % (self.fp,)
             jsframe = JSFrame(self.fp)
             # ignore dummy native frames
             if jsframe.pc:
                 syn_frames.append(jsframe)
             done = bp >= self.fp and self.fp >= prev_bp
-            print 'fp: ', self.fp, 'bp', bp, 'prev_bp', prev_bp, 'done', done
+            #print 'fp: ', self.fp, 'bp', bp, 'prev_bp', prev_bp, 'done', done
             self.fp = forceint(getfield(self.fp, self.frame_down))
 
 class JSFrameHelper(object):
@@ -191,13 +209,15 @@ class JSFrameHelper(object):
 
         cur = contextList
         contextListAddr = contextList.address
-        while cur['next'] != contextListAddr:
+        while True:
             # get the context
             # force the address into integer space through being a string
             #  since gdb.Value won't let us directly coerce
             context_addr = int(str(cur.address), 16) - self.jscontext_link_offset
             self.contexts[context_addr] = JSScratchContext(context_addr)
             cur = cur['next'].dereference()
+            if cur.address == contextListAddr:
+                break
 
     def setup(self):
         contextList = gdb.parse_and_eval(
@@ -211,10 +231,18 @@ class JSFrameHelper(object):
         #  pushed on, so we need to add 2 words to actually get the bp
         frame_str = str(frame)
         # len("{stack=")
-        return int(frame_str[7:frame_str.find(",")], 16) - 8
+        if platform_is_32bit():
+            return int(frame_str[7:frame_str.find(",")], 16) - 8
+        else:
+            return int(frame_str[7:frame_str.find(",")], 16) - 16
+
 
     def _get_scx_for_frame(self, frame):
         cx_addr = int(str(frame.read_var("cx")), 16)
+        if not cx_addr in self.contexts:
+            print 'context %x is unknown!  but I do know...' % (cx_addr,)
+            for known_cx in self.contexts.keys():
+                print '  %x' % (known_cx,)
         return self.contexts[cx_addr]
 
     def process_frame(self, frame):
@@ -241,7 +269,7 @@ class JSFrameHelper(object):
 
         elif pc >= self.jsinvoke.start and pc <= self.jsinvoke.end:
             flags = frame.read_var("flags")
-            print '*** invoke', flags
+            #print '*** invoke', flags
             scx = self._get_scx_for_frame(frame)
             # there is a locale frame variable, pop until we get to it
             scx.popUntilFrame(syn_frames, bp, prev_bp)
@@ -251,7 +279,7 @@ class JSFrameHelper(object):
             pass
 
         elif pc >= self.jsexec.start and pc <= self.jsexec.end:
-            print '*** exec'
+            #print '*** exec'
             scx = self._get_scx_for_frame(frame)
             # there is a local 'frame' variable
             scx.popUntilFrame(syn_frames, bp, prev_bp)
@@ -264,7 +292,7 @@ class JSFrameHelper(object):
             scx.restoreDormantChain()
         elif (pc >= self.xpcmethod.start and
                   pc <= self.xpcmethod.end):
-            print '*** xpc method'
+            #print '*** xpc method'
             # we should probably be traversing the XPCJSContextStack
             #  concurrently
             ### trying out heuristics...
@@ -309,7 +337,7 @@ def mozbt():
         iterFrames = itertools.izip (itertools.count (0), iterFrames)
 
         for iFrame, gdbFrame in iterFrames:
-            print '===== ', iFrame
+            #print '===== ', iFrame
             frames.append(gbt.ColorFrameWrapper(gdbFrame, context, iFrame))
         context.process()
 
