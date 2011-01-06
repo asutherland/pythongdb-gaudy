@@ -221,7 +221,7 @@ class ColorFrameWrapper(object):
 
     # FIXME: this should probably just be a method on gdb.Frame.
     # But then we need stream wrappers.
-    def describe (self, frame_num, full, args=True):
+    def describe (self, frame_num, mode, args=True):
         if self.syn_frames:
             for syn_frame in self.syn_frames:
                 pout('{s}JS {ln}%010x {s}in {jfn}%s {s}at {cn}%s{s}:{ln}%d{-fg}',
@@ -250,26 +250,35 @@ class ColorFrameWrapper(object):
                     # stream.write (" from " + lib)
                     pass
 
-            pout('{s}%2.2d {ln}%010x {s}in {fn}%s {s}at {cn}%s{s}:{ln}%d{-fg}',
-                 frame_num, pc, name,
-                 sal.symtab and sal.symtab.filename and self.context.chewPath(sal.symtab.filename) or '???',
-                 sal.line)
-            pout.i(2)
-            if args:
-                self.print_frame_args(self.func)
+            if mode == MODE_TERSE:
+                pout('{s}%3.3d {fn}%s{-fg}',
+                     frame_num, name)
+            else:
+                pout('{s}%3.3d {ln}%010x {s}in {fn}%s {s}at {cn}%s{s}:{ln}%d{-fg}',
+                     frame_num, pc, name,
+                     sal.symtab and sal.symtab.filename and self.context.chewPath(sal.symtab.filename) or '???',
+                     sal.line)
+                pout.i(2)
+                if args:
+                    self.print_frame_args(self.func)
 
-            if full:
-                self.print_frame_locals (self.func)
-            pout.i(-2)
+                if mode == MODE_FULL:
+                    self.print_frame_locals (self.func)
+                pout.i(-2)
 
     def __getattr__ (self, name):
         return getattr (self.frame, name)
+
+MODE_NORMAL = 0
+MODE_TERSE = 1
+MODE_FULL = 2
 
 class ColorFilteringBacktrace (gdb.Command):
     """Print backtrace of all stack frames, or innermost COUNT frames.
 With a negative argument, print outermost -COUNT frames.
 Use of the 'full' qualifier also prints the values of the local variables.
 Use of the 'raw' qualifier avoids any filtering by loadable modules.
+Use of the 'terse' qualifier tells us to only show class name.
 """
 
     def __init__ (self):
@@ -293,7 +302,7 @@ Use of the 'raw' qualifier avoids any filtering by loadable modules.
         i = 0
         count = 0
         filter = True
-        full = False
+        mode = MODE_NORMAL
 
         for word in arg.split (" "):
             if word == '':
@@ -301,7 +310,9 @@ Use of the 'raw' qualifier avoids any filtering by loadable modules.
             elif word == 'raw':
                 filter = False
             elif word == 'full':
-                full = True
+                mode = MODE_FULL
+            elif word == 'terse':
+                mode = MODE_TERSE
             else:
                 count = int (word)
 
@@ -335,6 +346,6 @@ Use of the 'raw' qualifier avoids any filtering by loadable modules.
         # zero it...
         pout.i(-100)
         for pair in iterFrames:
-            pair[1].describe (pair[0], full)
+            pair[1].describe (pair[0], mode)
 
 ColorFilteringBacktrace()
