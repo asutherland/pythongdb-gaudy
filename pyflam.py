@@ -19,19 +19,37 @@
 ###  that is explicitly GPL v3 in the first place!  However, this will probably
 ###  still get licensed under something more permissive...
 
-import re, sys, os.path
-        
+import re, sys, os.path, time, textwrap
+
 class FlamOut(object):
     def __init__(self, fout=None):
         self.fout = fout or sys.stdout
 
         self._cmap = {}
-        self._pat = re.compile('(?:{([^}]+)})|(%([-#0 +]*)(\d*)\.?(\d*)([sdx]))')
+        self._pat = re.compile(
+            '(?:{([^}]+)})|(%([-#0 +~]*)(\d*)\.?(\d*)([sdx]))')
 
         self.init_map()
 
         self._indentLevel = 0
         self._verbose = False
+
+        self._num_columns = None
+        self._columns_last_updated = None
+
+        self._wrapper = textwrap.TextWrapper()
+
+    def _get_terminal_columns(self):
+        # we just don't want to be doing this 100 times a second
+        if self._columns_last_updated is not None:
+            now = time.time()
+            if now - self._columns_last_updated > 2:
+                self._columns_last_updated = now;
+                self._num_columns = None
+        if self._num_columns is None:
+            import termhelp
+            self._num_columns = termhelp.getTerminalSize()[1]
+        return self._num_columns
 
     def configure(self, **kwargs):
         self._verbose = kwargs.get('verbose', self._verbose)
@@ -177,6 +195,29 @@ class FlamOut(object):
             self._indentLevel = 0
 
     def __call__(self, msg, *args, **kwargs):
+        '''
+        Formatting atoms, illustrated (colons are delimiters):
+        - {color code}: Where color code is one of our character sequences like
+                         "g", "b", etc.
+        - {.24}: Inserts space characters so the cursor is positioned at column
+                  24.  It does nothing if you are already at/past column 24.
+
+        - %x: Print hex-formatted number with 0x prefix.
+        - %d: Print as decimal number, no padding.
+        - %s: Print as string, no padding.
+
+        - %10s: Right-aligned string padded out to 10 characters with spaces.
+        - %-10s: Left-aligned string padded out to 10 characters in length.
+        - %.10s: String truncated to a maximum length of 10 characters.
+        - %10.10s: Right-aligned string padded out to 10 characters with spaces;
+                    truncated if its length exceeds 10 characters.
+        - %10d: Right-aligned decimal number padded with spaces/truncated.
+        - %-10d: Left-aligned decimal number padded with spaces/truncated.
+
+        - %~2s: String wrapped at the screen's column width and indented 2
+                 characters further in than the column the first character of
+                 the string is going in.
+        '''
         state = {'offset': self._indentLevel, 'iarg': 0}
         def map_helper(m):
             state['offset'] = state['offset'] + m.start(0) - state.get('lstart',0)
@@ -191,10 +232,6 @@ class FlamOut(object):
                 
                 #%([#0- +]*)(\d*)(?:\.(\d*))?[sdx]
                 alignLeft = False
-                if m.group(3):
-                    conversionFlags = m.group(3)
-                    if '-' in conversionFlags:
-                        alignLeft = True
                 if m.group(4):
                     mini = int(m.group(4))
                 else:
@@ -203,6 +240,27 @@ class FlamOut(object):
                     limit = int(m.group(5))
                 else:
                     limit = 64000
+                if m.group(3):
+                    conversionFlags = m.group(3)
+                    if '-' in conversionFlags:
+                        alignLeft = True
+                    if '~' in conversionFlags:
+                        cur_offset = state['offset']
+                        next_offset = cur_offset + mini - self._indentLevel
+                        mini = 0
+                        wrapper = self._wrapper
+                        # We need to tell the wrapper our current indent offset
+                        #  even though we don't want to output it; we will slice
+                        #  it back off before using the output.
+                        wrapper.initial_indent = ' ' * cur_offset
+                        wrapper.subsequent_indent = ' ' * next_offset
+                        wrapper.width = self._get_terminal_columns()
+                        wrapped = wrapper.wrap(v)
+                        wrapped[0] = wrapped[0][cur_offset:]
+                        state['offset'] = len(wrapped[-1])
+                        v = '\n'.join(wrapped)
+                        state['iarg'] = iarg + 1
+                        return v
                     
                 if len(v) > limit:
                     v = v[:limit]
@@ -242,6 +300,9 @@ class FlamOut(object):
         self.fout.write(ostr + '\n')
     
     def pp(self, o, label=None, indent=0):
+        '''
+        Colorized pretty printer.
+        '''
         if label:
             self('{n}%s', label)
         if type(o) in (tuple, list):

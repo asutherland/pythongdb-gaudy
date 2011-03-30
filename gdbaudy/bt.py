@@ -18,7 +18,8 @@
 # Well, okay, now it has the ContextHelper and so does much more work and is
 #  arguably less efficient, perhaps more ugly, etc. etc.
 
-import gdb, gdb.backtrace
+import gdb
+import gdb.backtrace
 from gdb.FrameIterator import FrameIterator
 import itertools
 
@@ -120,8 +121,6 @@ class ColorFrameWrapper(object):
         self.context = context
         self.frame_num = frame_num
 
-        self.func = self.frame.function()
-
         # -- Tell the context about the file path
         # symtab and line
         sal = self.frame.find_sal()
@@ -129,11 +128,16 @@ class ColorFrameWrapper(object):
             self.context.considerPath(sal.symtab.filename)
         
         # -- Tell the function about all the values it sees (args and locals)
-        if self.func:
-            for sym in self.func.value:
+        block = self.block = None
+        try:
+            block = self.block = self.frame.block()
+        except:
+            pass
+        if block:
+            for sym in block:
                 self.context.considerValue(
                     self.frame_num,
-                    *self.munge_symbol(sym, self.func.value))
+                    *self.munge_symbol(sym, block))
 
         self.syn_frames, self.show_me = self.context.runHelpers(self.frame)
 
@@ -166,12 +170,11 @@ class ColorFrameWrapper(object):
             val = "???"
         return sym.print_name, val
 
-    def print_frame_locals (self, func_sym):
-        if not func_sym:
+    def print_frame_locals (self, block):
+        if not block:
             return
 
         first = True
-        block = func_sym.value
 
         fmtbits = []
         fmtvals = []
@@ -192,12 +195,15 @@ class ColorFrameWrapper(object):
 
         pout('\n'.join(fmtbits), *fmtvals)
 
-    def print_frame_args (self, func_sym):
-        if not func_sym:
+    def print_frame_args (self, block):
+        if not block:
             return
+        # if there are locals, we will have a block with no associated
+        #  function, but its superblock should be the args!
+        if block.function is None:
+            block = block.superblock
 
         first = True
-        block = func_sym.value
 
         fmtbits = []
         fmtvals = []
@@ -212,7 +218,7 @@ class ColorFrameWrapper(object):
                 fmtbits.append('{sk}%s{s}={sv}%s {' + valColor + '}%s')
                 fmtvals.extend((key, val, valDesc))
             else:
-                fmtbits.append('{sk}%s{s}={sv}%s')
+                fmtbits.append('{sk}%s{s}={sv}%~2s')
                 fmtvals.append(key)
                 fmtvals.append(val)
 
@@ -244,7 +250,7 @@ class ColorFrameWrapper(object):
             if not name:
                 name = "??"
 
-            if not self.frame.name () or (not sal.symtab or not sal.symtab.filename):
+            if not name or (not sal.symtab or not sal.symtab.filename):
                 lib = gdb.solib_address (pc)
                 if lib:
                     # stream.write (" from " + lib)
@@ -254,20 +260,22 @@ class ColorFrameWrapper(object):
                 pout('{s}%3.3d {fn}%s{-fg}',
                      frame_num, name)
             else:
-                pout('{s}%3.3d {ln}%010x {s}in {fn}%s {s}at {cn}%s{s}:{ln}%d{-fg}',
-                     frame_num, pc, name,
+                pout('{s}%3.3d {fn}%s {s}at {cn}%s{s}:{ln}%d {ln}%010x{-fg}',
+                     frame_num, name,
                      sal.symtab and sal.symtab.filename and self.context.chewPath(sal.symtab.filename) or '???',
-                     sal.line)
-                pout.i(2)
+                     sal.line, pc)
+                pout.i(6)
                 if args:
-                    self.print_frame_args(self.func)
+                    self.print_frame_args(self.block)
 
                 if mode == MODE_FULL:
-                    self.print_frame_locals (self.func)
-                pout.i(-2)
+                    if not args:
+                        block = self.frame.block()
+                    self.print_frame_locals(self.block)
+                pout.i(-6)
 
-    def __getattr__ (self, name):
-        return getattr (self.frame, name)
+    #def __getattr__ (self, name):
+    #    return getattr (self.frame, name)
 
 MODE_NORMAL = 0
 MODE_TERSE = 1
@@ -321,7 +329,7 @@ Use of the 'terse' qualifier tells us to only show class name.
         context = ContextHelper()
 
         frames = []
-        iterFrames = FrameIterator (gdb.selected_thread().newest_frame())
+        iterFrames = FrameIterator (gdb.newest_frame())
         if filter:
             iterFrames = gdb.backtrace.create_frame_filter (iterFrames)
 
