@@ -134,6 +134,9 @@ class ColorFrameWrapper(object):
         except:
             pass
         if block:
+            # if this is a locals frame, jump up to the args frame...
+            if block.function is None:
+                block = block.superblock
             for sym in block:
                 self.context.considerValue(
                     self.frame_num,
