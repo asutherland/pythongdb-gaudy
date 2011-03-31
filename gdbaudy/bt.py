@@ -72,7 +72,7 @@ class ContextHelper(object):
             curNode = subNode
 
     def considerValue(self, frame_num, name, value):
-        if value.startswith('0x'):
+        if isinstance(value, str) and value.startswith('0x'):
             if value in self.seenValues:
                 info = self.seenValues[value]
                 info['count'] += 1
