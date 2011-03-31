@@ -46,6 +46,8 @@ class FlamOut(object):
             if now - self._columns_last_updated > 2:
                 self._columns_last_updated = now;
                 self._num_columns = None
+        else:
+            self._columns_last_updated = time.time()
         if self._num_columns is None:
             import termhelp
             self._num_columns = termhelp.getTerminalSize()[1]
@@ -228,7 +230,8 @@ class FlamOut(object):
                 state['offset'] = state['offset'] + mstart - lstart
             # yes newline means offset is since that newline
             else:
-                state['offset'] = mstart - idxPrevNewline - 1 # sub off the \n
+                # sub off the \n
+                state['offset'] = self._indentLevel + mstart - idxPrevNewline -1
             state['lstart'] = m.end(0)
 
             if m.group(2) is not None:
@@ -254,7 +257,7 @@ class FlamOut(object):
                         alignLeft = True
                     if '~' in conversionFlags:
                         cur_offset = state['offset']
-                        next_offset = cur_offset + mini
+                        next_offset = cur_offset + mini - self._indentLevel
                         mini = 0
                         wrapper = self._wrapper
                         # We need to tell the wrapper our current indent offset
