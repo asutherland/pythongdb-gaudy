@@ -11,28 +11,14 @@ import gdbaudy.bt as gbt
 import itertools
 import os.path
 
-## Very regrettably, our abuse of converting through string representations
-##  requires that mozilla.js not be used.  Some day, we might fix this.
-
-#import mozilla.js as mjs
+import mozilla.js as mjs
 
 pout = gbt.pout
 
 def get_func_block(funcName):
-    return gdb.lookup_symbol(funcName)[0].value
-
-def get_field_def(typeName, fieldName):
-    gdbtype = gdb.lookup_type(typeName)
-    if gdbtype is None:
-        raise Exception("Unable to locate type: " + typeName)
-    for field in gdbtype.fields():
-        if field.name == fieldName:
-            return field
-    raise Exception("Unable to locate field '%s' in type '%s'" %
-                    (typeName, fieldName))
-
-def offset(typeName, fieldName):
-    return int(get_field_def(typeName, fieldName).bitpos) / 8
+    # this is a completely and utterly ridiculous thing to have to do...
+    pc = gdb.decode_line(funcName)[1][0].pc
+    return gdb.block_for_pc(pc)
 
 def norm_js_path(path):
     # pass chrome paths through intact
@@ -43,115 +29,74 @@ def norm_js_path(path):
         path = path[7:]
     return os.path.split(path)[1]
 
-def guestload32(addr):
-    return int(gdb.parse_and_eval("*(int *)0x%x" % (addr,)))
-
-def guestload64(addr):
-    return int(gdb.parse_and_eval("*(long *)0x%x" % (addr,)))
-
-platform32 = None
-def platform_is_32bit():
-    global platform32
-    if platform32 is None:
-        platform32 = gdb.lookup_type("int").reference().sizeof == 4
-    return platform32
-
-
-def get_js_string_from_atom(atom, default):
-    if atom == 0:
-        return default
-    # er, we could pull from the struct but I'm cribbing from
-    #  jsstack.emt at this point since we really should just be using
-    #  archer-mozilla...
-    if platform_is_32bit():
-        flat_str = atom & 0xfffffff8
-        str_len = (guestload32(flat_str) & 0xff) * 2
-        str_addr = guestload32(flat_str + 4)
-    else:
-        flat_str = atom & 0xfffffffffffffff8
-        str_len = (guestload64(flat_str) & 0xff) * 2
-        str_addr = guestload64(flat_str + 8)
-    
-    inferior = gdb.inferiors()[0]
-    str_data = str(inferior.read_memory(str_addr, str_len))
-    return str_data.decode("utf-16")
+def get_func_name_from_atom(p_atom, default):
+    atom_ptr = mjs.JSAtomPtr(p_atom)
+    # eat the quotes
+    return atom_ptr.summary()[1:-1]
 
 class JSFrame(object):
-    frame_regs = get_field_def("JSStackFrame", "regs")
-    regs_pc = get_field_def("JSFrameRegs", "pc")
-    frame_script = get_field_def("JSStackFrame", "script")
-    script_filename = get_field_def("JSScript", "filename")
-    script_lineno = get_field_def("JSScript", "lineno")
-    frame_fun = get_field_def("JSStackFrame", "fun")
-    func_atom = get_field_def("JSFunction", "atom")
+    JSFRAME_FUNCTION = 0x2
+
     '''
     Represents a javascript stack frame.
     '''
-    def __init__(self, fp):
-        regs = forceint(getfield(fp, self.frame_regs))
-        if regs:
-            self.pc = getfield(regs, self.regs_pc)
-        else:
-            self.pc = 0
+    def __init__(self, fp, pc):
+        self.pc = pc
+        frame = fp.dereference()
+        flags = int(frame['flags_'])
 
-        script = forceint(getfield(fp, self.frame_script))
-        if script:
-            filename_str = getfield(script, self.script_filename)
-            self.filename = norm_js_path(filename_str.string())
-            self.line = getfield(script, self.script_lineno)
+        if flags & self.JSFRAME_FUNCTION:
+            p_fun = frame['exec']['fun']
+            fun = p_fun.dereference()
+            p_script = fun['u']['i']['script'];
+            p_atom = fun['atom']
+            self.func_name = get_func_name_from_atom(p_atom, '<noatom>')
+        else:
+            p_script = frame['exec']['script'];
+            self.func_name = '<anon>'
+            
+        if p_script:
+            script = p_script.dereference()
+            self.filename = script['filename'].string()
+            self.line = int(script['lineno'])
         else:
             self.filename = '<none>'
             self.line = 0
 
-        #print 'building frame', self.filename, self.line
-
-        fun = forceint(getfield(fp, self.frame_fun))
-        if fun:
-            atom = forceint(getfield(fun, self.func_atom))
-            self.func_name = get_js_string_from_atom(atom, '<anon>')
-        else:
-            self.func_name = '<anon>'
-        #print '  func:', self.func_name
-
-def forceint(blah):
-    return int(str(blah), 16)
-
-def getfield(addr, fielddef):
-    #print fielddef.type
-    #print ':', addr
-    evalstr = "*(%s*) 0x%x" % (fielddef.type,
-                              addr + fielddef.bitpos / 8)
-    #print 'evaluating', evalstr
-    return gdb.parse_and_eval(evalstr)
+PTR_TYPE = gdb.lookup_type("void").pointer()
 
 class JSScratchContext(object):
-    cx_fp = get_field_def("JSContext", "fp")
-    cx_dormantFrameChain = get_field_def("JSContext", "dormantFrameChain")
-    frame_dormantNext = get_field_def("JSStackFrame", "dormantNext")
-    frame_down = get_field_def("JSStackFrame", "down")
-
     '''
+    Corresponds to a JSContext.
+
     Because the state of a JSContext changes with control-flow, we need to
     reconstruct its state during our traversal of the call stack.
     '''
-    def __init__(self, addr):
+    def __init__(self, p_cx):
         '''
         Suck up the current state of the context (that we care about).
         '''
-        self.fp = forceint(getfield(addr, self.cx_fp))
-        self.dormantFrameChain = forceint(
-            getfield(addr, self.cx_dormantFrameChain))
-
-    def restoreDormantChain(self):
-        #print '!!! restore chain'
-        #print '  before fp:', self.fp, 'dormant', self.dormantFrameChain
-        self.fp = self.dormantFrameChain
-        if self.fp:
-            self.dormantFrameChain = forceint(
-                getfield(self.fp, self.frame_dormantNext))
+        cx = p_cx.dereference()
+        p_regs = cx['regs']
+        if p_regs:
+            self.regs = p_regs.dereference()
         else:
-            self.dormantFrameChain = 0
-        #print '  after fp:', self.fp, 'dormant', self.dormantFrameChain
+            self.regs = None
+            return
+        
+        self.fp = self.regs['fp']
+        self.pc = self.regs['pc']
+        self.currentSegment = cx['currentSegment'].dereference()
+
+    def restoreSegment(self):
+        p_prevSegment = self.currentSegment['previousInContext']
+        if not p_prevSegment:
+            raise Exception('Tried to restore nonexistent segment')
+
+        self.currentSegment = p_prevSegment.dereference()
+        self.regs = self.currentSegment['suspendedRegs'].dereference()
+        self.fp = self.regs['fp']
+        self.pc = self.regs['pc']
 
     def hackRestore(self):
         '''
@@ -161,9 +106,9 @@ class JSScratchContext(object):
         '''
         # if we have no fp, then restore
         if self.fp == 0:
-            self.restoreDormantChain()
+            self.restoreSegment()
 
-    def popUntilFrame(self, syn_frames, bp, prev_bp):
+    def popUntilFrame(self, syn_frames, stop_at_fp):
         '''
         Keep popping frames off this context (and generating synthetic frames)
         until we find a frame whose address is in the range defined by bp and
@@ -171,26 +116,32 @@ class JSScratchContext(object):
         '''
         #print 'bp: %x prev_bp: %x' % (bp, prev_bp)
         done = False
-        if self.fp == 0 and self.dormantFrameChain:
+        if self.fp == 0:
             #print '  @@ compelling restore based on heuristic'
-            self.restoreDormantChain()
+            self.restoreSegment()
 
+        cur_pc = self.pc
         while not done:
             if self.fp == 0:
-                raise Exception('We should have a frame!')
+                #raise Exception('We should have a frame!')
+                self.restoreSegment()
             #print 'fp: %x' % (self.fp,)
-            jsframe = JSFrame(self.fp)
+            jsframe = JSFrame(self.fp, cur_pc)
             # ignore dummy native frames
-            if jsframe.pc:
+            if cur_pc:
                 syn_frames.append(jsframe)
-            done = bp >= self.fp and self.fp >= prev_bp
-            #print 'fp: ', self.fp, 'bp', bp, 'prev_bp', prev_bp, 'done', done
-            self.fp = forceint(getfield(self.fp, self.frame_down))
+            done = self.fp == stop_at_fp
+
+            # each frame stores the pc of its previous frame...
+            cur_pc = self.fp.dereference()['prevpc_']
+            #print 'fp: ', self.fp, 'term fp', stop_at_fp, 'done', done
+            self.fp = self.fp.dereference()['prev_']
 
 class JSFrameHelper(object):
-    jsinterp = get_func_block("js_Interpret")
-    jsexec = get_func_block("js_Execute")
-    jsinvoke = get_func_block("js_Invoke")
+    jsinterp = get_func_block("js::Interpret")
+    jsexec = get_func_block("js::Execute")
+    # js::Invoke setups up the frame for RunScript, so we use RunScript
+    jsinvoke = get_func_block("js::RunScript")
 
     xpcmethod = get_func_block("XPC_WN_CallMethod")
 
@@ -201,7 +152,9 @@ class JSFrameHelper(object):
 
     def _chew_context_list(self, contextList):
         '''
-        Given a JSCList contextList of JSContexts,
+        Given a JSCList contextList of JSContexts, create a JSScratchContext
+        instance corresponding to each context and store them indexed by their
+        memory address.
 
         @param contextList the JSCList belonging to a JSRuntime
         '''
@@ -220,29 +173,17 @@ class JSFrameHelper(object):
                 break
 
     def setup(self):
-        contextList = gdb.parse_and_eval(
-            "nsXPConnect::gSelf->mRuntime->mJSRuntime->contextList")
-        self._chew_context_list(contextList)
+        #contextList = gdb.parse_and_eval(
+        #    "nsXPConnect::gSelf->mRuntime->mJSRuntime->contextList")
+        #self._chew_context_list(contextList)
 
-    def _get_bp_from_frame(self, frame):
-        # ugly attempt to get the bp... we can only get the stack_addr from the
-        #  frame_id by stringifying it and hacking it out.  Then, stack_addr
-        #  is defined to basically be our stack frame before IP and BP are
-        #  pushed on, so we need to add 2 words to actually get the bp
-        frame_str = str(frame)
-        # len("{stack=")
-        if platform_is_32bit():
-            return int(frame_str[7:frame_str.find(",")], 16) - 8
-        else:
-            return int(frame_str[7:frame_str.find(",")], 16) - 16
-
+        self.contexts = {}
 
     def _get_scx_for_frame(self, frame):
-        cx_addr = int(str(frame.read_var("cx")), 16)
+        p_cx = frame.read_var("cx")
+        cx_addr = p_cx.cast(PTR_TYPE)
         if not cx_addr in self.contexts:
-            print 'context %x is unknown!  but I do know...' % (cx_addr,)
-            for known_cx in self.contexts.keys():
-                print '  %x' % (known_cx,)
+            self.contexts[cx_addr] = JSScratchContext(p_cx)
         return self.contexts[cx_addr]
 
     def process_frame(self, frame):
@@ -250,17 +191,7 @@ class JSFrameHelper(object):
         show_me = True
 
         pc = frame.pc()
-        bp = self._get_bp_from_frame(frame)
         next_frame = frame.newer()
-        if next_frame:
-            prev_bp = self._get_bp_from_frame(next_frame)
-        else:
-            # uh, if we had a way to get the stack pointer we could be smart
-            #  about this, but nothing in the python API is helping right now,
-            #  so let's just assume we have 8k of stack used.
-            # (we could probably walk the symbols for this block to do a better
-            #  guess, but I don't super-care. right now)
-            prev_bp = bp - 8192
 
         # Hide the interpreter frame; it had to come in via invoke or execute,
         #  and it will do the popping for us...
@@ -268,11 +199,11 @@ class JSFrameHelper(object):
             show_me = False
 
         elif pc >= self.jsinvoke.start and pc <= self.jsinvoke.end:
-            flags = frame.read_var("flags")
+            fp = frame.read_var("fp")
             #print '*** invoke', flags
             scx = self._get_scx_for_frame(frame)
             # there is a locale frame variable, pop until we get to it
-            scx.popUntilFrame(syn_frames, bp, prev_bp)
+            scx.popUntilFrame(syn_frames, fp)
             show_me = False
             
             # this dude just links his frame in.
@@ -281,15 +212,13 @@ class JSFrameHelper(object):
         elif pc >= self.jsexec.start and pc <= self.jsexec.end:
             #print '*** exec'
             scx = self._get_scx_for_frame(frame)
+            fp = frame.read_var("prev")
             # there is a local 'frame' variable
-            scx.popUntilFrame(syn_frames, bp, prev_bp)
+            scx.popUntilFrame(syn_frames, fp)
             show_me = False
             
-            # js_Execute diverts the context's previous fp to
-            #  cx->dormantFrameChain and cx->dormantFrameChain to
-            #  oldfp->dormantNext.  This means that when we encouter js_Execute,
-            #  we want to reverse this operation.
-            scx.restoreDormantChain()
+            # js_Execute pushes a new segment; we need to restore when we see it
+            scx.restoreSegment()
         elif (pc >= self.xpcmethod.start and
                   pc <= self.xpcmethod.end):
             #print '*** xpc method'
@@ -306,13 +235,14 @@ class JSFrameHelper(object):
             if not func_name:
                 pass
             # JS internal APIs are not interesting
-            elif (func_name.startswith("js_") or
-                  func_name.startswith("JS_")):
+            elif (func_name.startswith("JS_") or
+                  func_name.startswith("js::")):
                 show_me = False
             # XPConnect internals are not interesting
             elif (func_name.startswith("XPC") or
                   func_name.startswith("xpc_") or
-                  func_name.startswith("nsXPCWrapped")):
+                  func_name.startswith("nsXPCWrapped") or
+                  func_name.startswith("CallMethodHelper::")):
                 show_me = False
             elif (func_name == "PrepareAndDispatch" or
                   func_name == "NS_InvokeByIndex_P"):
@@ -329,7 +259,7 @@ def mozbt():
     context = gbt.ContextHelper(FRAME_HELPERS)
 
     frames = []
-    iterFrames = FrameIterator (gdb.selected_thread().newest_frame())
+    iterFrames = FrameIterator (gdb.newest_frame())
     if filter:
         iterFrames = gdb.backtrace.create_frame_filter (iterFrames)
 
@@ -347,7 +277,7 @@ def mozbt():
         # zero it...
         pout.i(-100)
         for pair in iterFrames:
-            pair[1].describe (pair[0], False, False)
+            pair[1].describe (pair[0], gbt.MODE_NORMAL, False)
 
 class MozBT(gdb.Command):
     """
