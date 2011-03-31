@@ -153,7 +153,9 @@ class ColorFrameWrapper(object):
         #  maybe this is a trick to get the fully qualified type?
         if len (sym.linkage_name):
             nsym, is_field_of_this = gdb.lookup_symbol (sym.linkage_name, block)
-            if nsym.addr_class != gdb.SYMBOL_LOC_REGISTER:
+            if not nsym:
+                return sym.linkage_name, '<danger=ignored>'
+            if nsym and nsym.addr_class != gdb.SYMBOL_LOC_REGISTER:
                 sym = nsym
 
         # load the value!
