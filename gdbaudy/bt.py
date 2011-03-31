@@ -251,7 +251,7 @@ class ColorFrameWrapper(object):
                 name = "??"
 
             if not name or (not sal.symtab or not sal.symtab.filename):
-                lib = gdb.solib_address (pc)
+                lib = gdb.solib_name (pc)
                 if lib:
                     # stream.write (" from " + lib)
                     pass
