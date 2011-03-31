@@ -29,7 +29,9 @@ def norm_js_path(path):
         path = path[7:]
     return os.path.split(path)[1]
 
-def get_func_name_from_atom(p_atom, default):
+def get_func_name_from_atom(p_atom):
+    if p_atom == 0:
+        return '<unnamed function>'
     atom_ptr = mjs.JSAtomPtr(p_atom)
     # eat the quotes
     return atom_ptr.summary()[1:-1]
@@ -50,7 +52,7 @@ class JSFrame(object):
             fun = p_fun.dereference()
             p_script = fun['u']['i']['script'];
             p_atom = fun['atom']
-            self.func_name = get_func_name_from_atom(p_atom, '<noatom>')
+            self.func_name = get_func_name_from_atom(p_atom)
         else:
             p_script = frame['exec']['script'];
             self.func_name = '<anon>'
@@ -138,17 +140,9 @@ class JSScratchContext(object):
             self.fp = self.fp.dereference()['prev_']
 
 class JSFrameHelper(object):
-    jsinterp = get_func_block("js::Interpret")
-    jsexec = get_func_block("js::Execute")
-    # js::Invoke setups up the frame for RunScript, so we use RunScript
-    jsinvoke = get_func_block("js::RunScript")
-
-    xpcmethod = get_func_block("XPC_WN_CallMethod")
-
-    jscontext_link_offset = offset("JSContext", "link")
 
     def __init__(self):
-        pass
+        self._initialized = False
 
     def _chew_context_list(self, contextList):
         '''
@@ -173,6 +167,16 @@ class JSFrameHelper(object):
                 break
 
     def setup(self):
+        if not self._initialized:
+            self.jsinterp = get_func_block("js::Interpret")
+            self.jsexec = get_func_block("js::Execute")
+            # js::Invoke setups up the frame for RunScript, so we use RunScript
+            self.jsinvoke = get_func_block("js::RunScript")
+
+            self.xpcmethod = get_func_block("XPC_WN_CallMethod")
+
+            self._initialized = True
+
         #contextList = gdb.parse_and_eval(
         #    "nsXPConnect::gSelf->mRuntime->mJSRuntime->contextList")
         #self._chew_context_list(contextList)
