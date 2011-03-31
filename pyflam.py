@@ -220,7 +220,15 @@ class FlamOut(object):
         '''
         state = {'offset': self._indentLevel, 'iarg': 0}
         def map_helper(m):
-            state['offset'] = state['offset'] + m.start(0) - state.get('lstart',0)
+            lstart = state.get('lstart', 0)
+            mstart = m.start(0)
+            idxPrevNewline = msg.rfind('\n', lstart, mstart)
+            # no newline means increment
+            if idxPrevNewline == -1:
+                state['offset'] = state['offset'] + mstart - lstart
+            # yes newline means offset is since that newline
+            else:
+                state['offset'] = mstart - idxPrevNewline - 1 # sub off the \n
             state['lstart'] = m.end(0)
 
             if m.group(2) is not None:
@@ -246,7 +254,7 @@ class FlamOut(object):
                         alignLeft = True
                     if '~' in conversionFlags:
                         cur_offset = state['offset']
-                        next_offset = cur_offset + mini - self._indentLevel
+                        next_offset = cur_offset + mini
                         mini = 0
                         wrapper = self._wrapper
                         # We need to tell the wrapper our current indent offset
@@ -257,7 +265,10 @@ class FlamOut(object):
                         wrapper.width = self._get_terminal_columns()
                         wrapped = wrapper.wrap(v)
                         wrapped[0] = wrapped[0][cur_offset:]
-                        state['offset'] = len(wrapped[-1])
+                        if len(wrapped) > 1:
+                            state['offset'] = len(wrapped[-1])
+                        else:
+                            state['offset'] = state['offset'] + len(wrapped[0])
                         v = '\n'.join(wrapped)
                         state['iarg'] = iarg + 1
                         return v
@@ -269,8 +280,11 @@ class FlamOut(object):
                         v += ' ' * (mini - len(v))
                     else:
                         v = ' ' * (mini - len(v)) + v
-                            
-                state['offset'] = state['offset'] + len(v)
+                idxNewline = v.rfind('\n')
+                if idxNewline == -1:
+                    state['offset'] = state['offset'] + len(v)
+                else:
+                    state['offset'] = len(v) - idxNewline - 1
                 state['iarg'] = iarg + 1
                 return v
             
@@ -280,7 +294,6 @@ class FlamOut(object):
                 desired_offset = int(m.group(1)[1:])
                 space = ' ' * (desired_offset - state['offset'])
                 state['offset'] = desired_offset
-                state['lstart'] = m.end(0)
                 return space
             #print 'delta:', m.start(0) - state.get('lstart',0)
             
