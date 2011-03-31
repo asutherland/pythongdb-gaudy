@@ -240,6 +240,7 @@ class JSFrameHelper(object):
                 pass
             # JS internal APIs are not interesting
             elif (func_name.startswith("JS_") or
+                  func_name.startswith("js_") or
                   func_name.startswith("js::")):
                 show_me = False
             # XPConnect internals are not interesting
