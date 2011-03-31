@@ -230,7 +230,7 @@ class ColorFrameWrapper(object):
     def describe (self, frame_num, mode, args=True):
         if self.syn_frames:
             for syn_frame in self.syn_frames:
-                pout('{s} JS {jfn}%s {s}at {cn}%s{s}:{ln}%d {s}%010x{-fg}',
+                pout('{s} JS {jfn}%s {.48}{s}at {cn}%s{s}:{ln}%d {s}%010x{-fg}',
                      syn_frame.func_name,
                      syn_frame.filename,
                      #self.context.chewPath(syn_frame.filename) or '???',
@@ -250,6 +250,8 @@ class ColorFrameWrapper(object):
             name = self.frame.name ()
             if not name:
                 name = "??"
+            if name.startswith('mozilla::'):
+                name = name[9:]
 
             if not name or (not sal.symtab or not sal.symtab.filename):
                 lib = gdb.solib_name (pc)
@@ -261,7 +263,7 @@ class ColorFrameWrapper(object):
                 pout('{s}%3.3d {fn}%s{-fg}',
                      frame_num, name)
             else:
-                pout('{s}%3.3d {fn}%s {s}at {cn}%s{s}:{ln}%d {s}%010x{-fg}',
+                pout('{s}%3.3d {fn}%s {.48}{s}at {cn}%s{s}:{ln}%d {s}%010x{-fg}',
                      frame_num, name,
                      sal.symtab and sal.symtab.filename and self.context.chewPath(sal.symtab.filename) or '???',
                      sal.line, pc)

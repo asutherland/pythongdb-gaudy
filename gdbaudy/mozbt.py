@@ -181,7 +181,7 @@ class JSFrameHelper(object):
 
     def _get_scx_for_frame(self, frame):
         p_cx = frame.read_var("cx")
-        cx_addr = p_cx.cast(PTR_TYPE)
+        cx_addr = str(p_cx.cast(PTR_TYPE))
         if not cx_addr in self.contexts:
             self.contexts[cx_addr] = JSScratchContext(p_cx)
         return self.contexts[cx_addr]
