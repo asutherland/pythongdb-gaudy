@@ -19,14 +19,13 @@
 #  arguably less efficient, perhaps more ugly, etc. etc.
 
 import gdb
-import gdb.backtrace
+import gdb.frames
 from gdb.FrameIterator import FrameIterator
-import itertools
 
-import gdb.command.backtrace
 from pyflam import *
 import sys
 import os.path
+import itertools
 
 class ContextHelper(object):
     def __init__(self, frameHelpers=[]):
@@ -167,9 +166,9 @@ class ColorFrameWrapper(object):
             if val != None:
                 val = str (val)
         # FIXME: would be nice to have a more precise exception here.
-        except RuntimeError, text:
+        except RuntimeError as text:
             val = text
-        except Exception, e:
+        except Exception as e:
             val = "problemo"
         if val == None:
             val = "???"
@@ -265,8 +264,13 @@ class ColorFrameWrapper(object):
                     pass
 
             if mode == MODE_TERSE:
-                pout('{s}%3.3d {fn}%s{-fg}',
-                     frame_num, name)
+                pout('{s}%3.3d {fn}%s{s}:{ln}%d{-fg}',
+                     frame_num, name, sal.line)
+            elif mode == MODE_PASTE:
+                pout('{s}%3.3d {fn}%s{-fg}\n    {cn}%s{s}:{ln}%d{-fg}',
+                     frame_num, name,
+                     sal.symtab and sal.symtab.filename and self.context.chewPath(sal.symtab.filename) or '???',
+                     sal.line)
             else:
                 pout('{s}%3.3d {fn}%s {.48}{s}at {cn}%s{s}:{ln}%d {s}%010x{-fg}',
                      frame_num, name,
@@ -287,7 +291,8 @@ class ColorFrameWrapper(object):
 
 MODE_NORMAL = 0
 MODE_TERSE = 1
-MODE_FULL = 2
+MODE_PASTE = 2
+MODE_FULL = 3
 
 class ColorFilteringBacktrace (gdb.Command):
     """Print backtrace of all stack frames, or innermost COUNT frames.
@@ -299,7 +304,6 @@ Use of the 'terse' qualifier tells us to only show class name.
 
     def __init__ (self):
         gdb.Command.__init__ (self, "cbt", gdb.COMMAND_STACK)
-        self.reverse = gdb.command.backtrace.ReverseBacktraceParameter()
 
     def reverse_iter (self, iter):
         result = []
@@ -329,6 +333,8 @@ Use of the 'terse' qualifier tells us to only show class name.
                 mode = MODE_FULL
             elif word == 'terse':
                 mode = MODE_TERSE
+            elif word == 'paste':
+                mode = MODE_PASTE
             else:
                 count = int (word)
 
@@ -337,23 +343,21 @@ Use of the 'terse' qualifier tells us to only show class name.
         context = ContextHelper()
 
         frames = []
-        iterFrames = FrameIterator (gdb.newest_frame())
+        iterFrames = None
         if filter:
-            iterFrames = gdb.backtrace.create_frame_filter (iterFrames)
+            iterFrames = gdb.frames.execute_frame_filters(gdb.newest_frame(), 0, -1)
+        if not iterFrames:
+            iterFrames = FrameIterator(gdb.newest_frame())
 
         # Now wrap in an iterator that numbers the frames.
-        iterFrames = itertools.izip (itertools.count (0), iterFrames)
+        iterFrames = zip(itertools.count (0), iterFrames)
 
         for iFrame, gdbFrame in iterFrames:
             frames.append(ColorFrameWrapper(gdbFrame, context, iFrame))
         context.process()
 
-        # Reverse if the user wanted that.
-        if self.reverse.value:
-            frames.reverse()
-
         # Extract sub-range user wants.
-        iterFrames = itertools.izip (itertools.count (0), iter(frames))
+        iterFrames = zip(itertools.count (0), iter(frames))
         if count < 0:
             iterFrames = self.final_n (iterFrames, count)
         elif count > 0:
