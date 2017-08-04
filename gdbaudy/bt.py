@@ -116,7 +116,7 @@ class ColorFrameWrapper(object):
     Wraps a frame.
     '''
     def __init__ (self, frame, context, frame_num):
-        self.frame = frame;
+        self.frame = frame
         self.context = context
         self.frame_num = frame_num
 
@@ -125,7 +125,7 @@ class ColorFrameWrapper(object):
         sal = self.frame.find_sal()
         if sal.symtab and sal.symtab.filename:
             self.context.considerPath(sal.symtab.filename)
-        
+
         # -- Tell the function about all the values it sees (args and locals)
         block = self.block = None
         try:
@@ -300,6 +300,7 @@ With a negative argument, print outermost -COUNT frames.
 Use of the 'full' qualifier also prints the values of the local variables.
 Use of the 'raw' qualifier avoids any filtering by loadable modules.
 Use of the 'terse' qualifier tells us to only show class name.
+Use of the 'paste' qualifier generates output suitable for pasting in bugzilla.
 """
 
     def __init__ (self):
@@ -352,7 +353,8 @@ Use of the 'terse' qualifier tells us to only show class name.
         # Now wrap in an iterator that numbers the frames.
         iterFrames = zip(itertools.count (0), iterFrames)
 
-        for iFrame, gdbFrame in iterFrames:
+        for iFrame, gdbFrameDecorator in iterFrames:
+            gdbFrame = gdbFrameDecorator.inferior_frame()
             frames.append(ColorFrameWrapper(gdbFrame, context, iFrame))
         context.process()
 
