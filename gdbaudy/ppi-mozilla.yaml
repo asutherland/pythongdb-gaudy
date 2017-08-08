@@ -1,0 +1,14 @@
+### Pretty Printer Points of Interest database.
+### Currently accessed via ppi.  Maybe it should be poi?  Or ppoi?
+
+swm:
+  name: ServiceWorkerManager
+  singleton: mozilla::dom::workers::gInstance
+
+procs:
+  name: ContentParents
+  singleton: mozilla::dom::ContentParent::sContentParents
+
+cpm:
+  name: ContentProcessManager
+  singleton: mozilla::dom::ContentProcessManager::sSingleton
