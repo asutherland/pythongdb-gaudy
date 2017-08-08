@@ -1,0 +1,42 @@
+### Smart Pointers ###
+
+RefPtr:
+  kind: Smart Pointer
+  traverse:
+    - mRawPtr
+# Aliases
+nsCOMPtr: RefPtr
+nsAutoPtr: RefPtr
+mozilla::StaticAutoPtr: RefPtr
+mozilla::StaticRefPtr: RefPtr
+
+UniquePtr:
+  kind: Smart Pointer
+  traverse:
+    - mTuple
+    - mFirstA
+
+### Containers ###
+
+# Note that the LinkedList is the container, posessing a "sentinel" member.  The
+# elements are LinkedListElements.  We only want to print the entire list if we
+# find ourselves looking at a LinkedList type.  Printing one member should not
+# print all its siblings.
+mozilla::LinkedList:
+  kind: Collection
+  iterate:
+    # "sentinel" is the magic that enters into our hard-coded logic for this
+    # case.
+    sentinel: sentinel
+    advance: mNext
+
+mozilla::dom::ContentParent:
+  # characterize by type and pid.
+  terse:
+  - mRemoteType: true
+  - mOtherPid: true
+
+mozilla::ipc::MessageChannel:
+  terse:
+  - mName: true
+  - mChannelState: true
