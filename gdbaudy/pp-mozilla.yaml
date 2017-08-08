@@ -16,6 +16,16 @@ UniquePtr:
     - mTuple
     - mFirstA
 
+### XPCOM-ish stuff ###
+nsAutoRefCnt:
+  kind: RefCount
+  terse:
+  - mValue: true
+  # Can this just be covered by the type name?
+  - isThreadSafe: true
+
+
+
 ### Containers ###
 
 # Note that the LinkedList is the container, posessing a "sentinel" member.  The
@@ -30,13 +40,55 @@ mozilla::LinkedList:
     sentinel: sentinel
     advance: mNext
 
+### DOM IPC ###
+
+mozilla::dom::IdType:
+  terse:
+  - mId: true
+# TODO: I think these want to both be extra terse displays that just amount to
+# the typename and the mId.
+mozilla::dom::ContentParentId: mozilla::dom::IdType
+mozilla::dom::TabId: mozilla::dom::IdType
+
 mozilla::dom::ContentParent:
   # characterize by type and pid.
   terse:
   - mRemoteType: true
   - mOtherPid: true
 
+mozilla::dom::ContentProcessManager:
+  simple:
+  - mContentParentMap: true
+
+# TODO: remove this type once our naive heuristics can handle the traversal
+# automatically.
+mozilla::dom::ContentProcessInfo:
+  simple:
+  - mCp: true
+  - mParentCpId: true
+  - mChildrenCpId: true
+  - mRemoteFrames: true
+
 mozilla::ipc::MessageChannel:
   terse:
   - mName: true
   - mChannelState: true
+
+
+### ServiceWorkers ###
+
+# This is all currently speculative.
+ServiceWorkerManager:
+  groups:
+  - registrations:
+    - mRegistrationInfos: terse
+  - documents:
+    - mControlledDocuments: terse
+    - mRegisteringDocuments: terse
+  - interceptions:
+    - mNavigationInterceptions: terse
+  - startup:
+    - mActor: bool
+    - mPendingOperations: terse
+  - debugging:
+    - mListeners: type

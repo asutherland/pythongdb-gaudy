@@ -7,6 +7,18 @@ from pyflam import *
 
 RE_TEMPLATE_NAME = re.compile("^([^<]+)<.*>$")
 
+def maybe_deref(val):
+    """Given a value that may be of a pointer type, dereference it if it is.
+
+For use in pretty-printing container scenarios where the value types are
+frequently pointers."""
+    if not val:
+        return val
+    vtype = val.type
+    if vtype.code == gdb.TYPE_CODE_PTR:
+        return val.dereference()
+    return val
+
 class PrettyPrintCommand(gdb.Command):
     """A prettier version of the gdb "print" command that supports its own
 YAML-defined pretty printer definitions in addition to Python-implemented pretty
@@ -58,14 +70,34 @@ Our driving goals, aware of the above are then:
                rule["kind"], tname, repr(steps))
 
 
-    def _log_enter_array(self, val, rule, tname):
-        pout.v("{s}Traversing %s %s", rule["kind"], tname)
+    def _log_enter_array(self, val, tname):
+        # XXX We're in a weird place here for the identifying type when it comes
+        # to "std::map".  The types we perceive may be way too complicated (due
+        # to it including the comparator, the allocation, and redundant type
+        # info, so we need extra magic.  (So tname is just "std::map" and
+        # val.type is the super complicated thing.  We can definitely add
+        # heuristics, if only to build on top of the stdc++ lib's pretty
+        # printers)
+        pout("{n}%s {s}%x", tname, val.address)
         pout.i(2)
 
     def _log_item_in_array(self, i, val):
         self._inspect(val)
 
-    def _log_exit_array(self, val, rule, tname):
+    def _log_exit_array(self, val, tname):
+        pout.i(-2)
+
+    def _log_enter_map(self, val, tname):
+        pout("{n}%s {s}%x", tname, val.address)
+        pout.i(2)
+
+    def _log_item_in_map(self, key, val):
+        pout("{k}%s{n}:", key)
+        pout.i(2)
+        self._inspect(val)
+        pout.i(-2)
+
+    def _log_exit_map(self, val, tname):
         pout.i(-2)
 
     def _log_terse_object(self, val, rule, tname, fieldDefs):
@@ -81,15 +113,22 @@ Our driving goals, aware of the above are then:
                     # decisions.
                     fmtvals.append(str(val[fieldName]))
                     fmtbits.append('{k}%s: {v}%s')
-                except e:
+                except Exception as e:
                     pout('{e}Error displaying field {n}%s {e}stack:\n{s}%s',
                          fieldName, e);
                     fmtvals.append('{k}%s: {e}Error')
         pout(' '.join(fmtbits), *fmtvals)
 
     def _log_enter_detailed_object(self, val, rule, tname):
-        pout("{s}Entering {n}%s", tname)
+        pout("{n}%s {s}%x", tname, val.address)
         pout.i(2)
+
+    def _log_field_in_detailed_object(self, key, val, displayMode):
+        # XXX use displayMode
+        pout("{k}%s{n}:", key)
+        pout.i(2)
+        self._inspect(val)
+        pout.i(-2)
 
     def _log_exit_detailed_object(self, val, rule, tname):
         pout.i(-2)
@@ -132,7 +171,7 @@ Our driving goals, aware of the above are then:
             sentinel = val[sentinel_name]
             pSentinel = sentinel.address
 
-            self._log_enter_array(val, rule, tname)
+            self._log_enter_array(val, tname)
 
             try:
                 # now walk until we loop
@@ -145,7 +184,7 @@ Our driving goals, aware of the above are then:
                     pNext = list_elem[advance_name]
                     i += 1
             finally:
-                self._log_exit_array(val, rule, tname)
+                self._log_exit_array(val, tname)
 
     def _print_terse(self, val, rule, tname):
         # XXX need to figure out the UX of this a bit more.  It seems like
@@ -161,8 +200,42 @@ Our driving goals, aware of the above are then:
         # excessive.
         self._log_terse_object(val, rule, tname, rule["terse"])
 
+    def _print_simple(self, val, rule, tname):
+        # multi-line object display without groups.
+        self._log_enter_detailed_object(val, rule, tname)
+        for fieldDef in rule["simple"]:
+            for fieldName, displayMode in fieldDef.items():
+                self._log_field_in_detailed_object(fieldName, val[fieldName],
+                                                   displayMode)
+        self._log_exit_detailed_object(val, rule, tname)
+
+    def _gdbvis_array(self, val, vis, tname):
+        self._log_enter_array(val, tname)
+        # (the index may be a formatted string, not just an integer)
+        for indexy, subval in vis.children():
+            try:
+                self._log_item_in_array(indexy, maybe_deref(subval))
+            except Exception as e:
+                pout("{e}Exception inspecting: %s", e)
+        self._log_exit_array(val, tname)
+
+
+    def _gdbvis_map(self, val, vis, tname):
+        self._log_enter_map(val, tname)
+        # (the index may be a formatted string, not just an integer)
+        for key, subval in vis.children():
+            try:
+                self._log_item_in_map(key, maybe_deref(subval))
+            except Exception as e:
+                pout("{e}Exception inspecting: %s", e)
+        self._log_exit_map(val, tname)
+
     def _inspect(self, val):
-        # figure out the type.
+        # pierce pointers.  Note that our caller may themselves have invoked
+        # maybe_deref, so this could get weird.
+        val = maybe_deref(val)
+
+        # figure out the type.gdbvis
         vtype = val.type
         #pout("vtype: %s %s %s %s", vtype, type(vtype), vtype.tag, type(vtype.tag))
         tmatch = RE_TEMPLATE_NAME.match(vtype.name)
@@ -177,7 +250,7 @@ Our driving goals, aware of the above are then:
         #pout("%s", repr(self.mapping))
         rule = self.mapping.get(tname)
         if rule:
-            # if this was an alias, pierce it
+            # if this was an alias, pierce itgdbvis
             if isinstance(rule, str):
                 rule = self.mapping.get(rule)
             #pout("Found mapping with kind %s", rule.get("kind", "default"))
@@ -187,23 +260,43 @@ Our driving goals, aware of the above are then:
                 self._iterate(val, rule, tname)
             elif "terse" in rule:
                 self._print_terse(val, rule, tname)
+            elif "simple" in rule:
+                self._print_simple(val, rule, tname)
             else:
                 pout("{e}Don't understand rule {n}%s {e}for type {n}%s",
                      repr(rule), tname)
             # Handled or errored appropriately, no need to fall through to the
             # default visualizer.
             return
-        else:
-            pout("{s}No mapping for %s", tname)
 
         vis = gdb.default_visualizer(val)
-        #pout("using default type: %s code: %s tag: %s", val.type.name, val.type.code, val.type.tag)
-        if vis:
-            pout("{n}%s", vis.to_string())
+        if vis and hasattr(vis, 'children'):
+            if hasattr(vis, 'display_hint'):
+                vis_type = vis.display_hint()
+            else:
+                # std::set doesn't implement display_hint
+                vis_type = "array"
+            if vis_type == "array":
+                self._gdbvis_array(val, vis, vis.to_string() or tname)
+                return
+            elif vis_type == "map":
+                self._gdbvis_map(val, vis, vis.to_string() or tname)
+                return
+        elif vis:
+            # the string case is effectively equivalent to just handing off to
+            # gdb, so leave it up to the fall-through case.
+            pass
         else:
-            pout("Don't know how to pretty-print %s", val.to_string())
+            pout("{s}No mapping or pretty-printer for {n}%s{s}, switching to gdb print.", tname)
+
+        # TODO implement our own form of fallback iteration over fields using
+        # heuristics here.
+        # gdb will do its standard thing here.
+        pout("{n}%s", str(val))
 
     def invoke(self, arg, from_tty):
+        # zero out our indentation in the event of exceptions breaking things.
+        pout.i(-1000)
         val = gdb.parse_and_eval(arg)
         self._inspect(val)
 
