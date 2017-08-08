@@ -24,8 +24,6 @@ nsAutoRefCnt:
   # Can this just be covered by the type name?
   - isThreadSafe: true
 
-
-
 ### Containers ###
 
 # Note that the LinkedList is the container, posessing a "sentinel" member.  The
@@ -39,6 +37,27 @@ mozilla::LinkedList:
     # case.
     sentinel: sentinel
     advance: mNext
+
+### String hacks
+# XXX remove this.  nsCString wasn't pretty printing for me in one of my test
+# cases, so I added this hack.  As I went to write the commit message, I
+# realized the problem is likely that I ran rr from outside the mozilla-central
+# tree and so the auto-loading heuristics failed to find the mozilla pretty
+# printers.  (I've been doing most of my other dev loop cycle from the right
+# location.)  I'm going to leave this in for a little if only because it's an
+# interesting edge case.
+nsCString:
+  kind: String
+  traverse:
+  - mData
+
+### Necko-ish Stuff ###
+
+mozilla::net::nsStandardURL:
+  # XXX this wants to be terse, but we need to rely on the underlying printer
+  # for strings and terse bypasses it.
+  simple:
+  - mSpec: true
 
 ### DOM IPC ###
 

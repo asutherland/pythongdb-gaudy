@@ -7,16 +7,28 @@ from pyflam import *
 
 RE_TEMPLATE_NAME = re.compile("^([^<]+)<.*>$")
 
-def maybe_deref(val):
-    """Given a value that may be of a pointer type, dereference it if it is.
+def maybe_deref(val, vtype=None):
+    """Given a value that may be of a pointer to a struct-ish type, dereference
+it if it is.
 
 For use in pretty-printing container scenarios where the value types are
-frequently pointers."""
+frequently pointers.  We intentionally avoid de-referencing in cases where we're
+dealing with things like char* and de-referencing breaks string printing."""
     if not val:
         return val
-    vtype = val.type
+    if not vtype:
+        vtype = val.type
     if vtype.code == gdb.TYPE_CODE_PTR:
-        return val.dereference()
+        derefed = val.dereference()
+        dtype = derefed.type
+        if (dtype.code == gdb.TYPE_CODE_STRUCT or
+            dtype.code == gdb.TYPE_CODE_UNION):
+           # TODO: maybe this is too simple?  There is TYPE_CODE_TYPEDEF, which
+           # could possibly mean typedefs trick us.
+           return derefed
+        else:
+            #pout('{s}not de-refing to %s from %s', dtype, vtype)
+            pass
     return val
 
 class PrettyPrintCommand(gdb.Command):
@@ -151,8 +163,7 @@ Our driving goals, aware of the above are then:
             # Dereference the pointer as we step through it.  We can't do
             # anything with a pointer type.  We probably do want to further log
             # this traversal, however.
-            if ctype.code == gdb.TYPE_CODE_PTR:
-                cur = cur.dereference()
+            cur = maybe_deref(cur, ctype)
 
         self._inspect(cur)
 
@@ -235,8 +246,23 @@ Our driving goals, aware of the above are then:
         # maybe_deref, so this could get weird.
         val = maybe_deref(val)
 
-        # figure out the type.gdbvis
-        vtype = val.type
+        # figure out the type; we want to use RTTI if available to downcast all
+        # the way.
+        vtype = val.dynamic_type
+        # that may have given us a better type, let's re-cast the value too.
+        try:
+            val = val.cast(vtype)
+        except:
+            pass
+
+        # we may be a pointer type or other simple type.  In particular, we may
+        # be a char*-type thing.  punt to gdb. for now.
+        if vtype.name is None:
+            # XXX gdb presents strings as `0xNNNN "foo bar"` in a single string
+            # which breaks our pretty schema.
+            pout("{n}%s", str(val))
+            return
+
         #pout("vtype: %s %s %s %s", vtype, type(vtype), vtype.tag, type(vtype.tag))
         tmatch = RE_TEMPLATE_NAME.match(vtype.name)
         if tmatch:
