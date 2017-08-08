@@ -135,11 +135,18 @@ Our driving goals, aware of the above are then:
         pout("{n}%s {s}%x", tname, val.address)
         pout.i(2)
 
+    def _log_enter_object_group(self, groupName, rule):
+        pout("{fn}%s:", groupName)
+        pout.i(2)
+
     def _log_field_in_detailed_object(self, key, val, displayMode):
         # XXX use displayMode
         pout("{k}%s{n}:", key)
         pout.i(2)
         self._inspect(val)
+        pout.i(-2)
+
+    def _log_exit_object_group(self, groupName, rule):
         pout.i(-2)
 
     def _log_exit_detailed_object(self, val, rule, tname):
@@ -220,6 +227,24 @@ Our driving goals, aware of the above are then:
                                                    displayMode)
         self._log_exit_detailed_object(val, rule, tname)
 
+    def _print_groups(self, val, rule, tname):
+        # multi-line object display without groups.
+        self._log_enter_detailed_object(val, rule, tname)
+
+        for groupDef in rule["groups"]:
+            for groupName, fieldDefs in groupDef.items():
+                self._log_enter_object_group(groupName, rule)
+
+                for fieldDef in fieldDefs:
+                    for fieldName, displayMode in fieldDef.items():
+                        self._log_field_in_detailed_object(fieldName, val[fieldName],
+                                                           displayMode)
+
+                self._log_exit_object_group(groupName, rule)
+        self._log_exit_detailed_object(val, rule, tname)
+
+
+
     def _gdbvis_array(self, val, vis, tname):
         self._log_enter_array(val, tname)
         # (the index may be a formatted string, not just an integer)
@@ -288,6 +313,8 @@ Our driving goals, aware of the above are then:
                 self._print_terse(val, rule, tname)
             elif "simple" in rule:
                 self._print_simple(val, rule, tname)
+            elif "groups" in rule:
+                self._print_groups(val, rule, tname)
             else:
                 pout("{e}Don't understand rule {n}%s {e}for type {n}%s",
                      repr(rule), tname)

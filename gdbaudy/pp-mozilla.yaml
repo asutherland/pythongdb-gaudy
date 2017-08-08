@@ -46,10 +46,23 @@ mozilla::LinkedList:
 # printers.  (I've been doing most of my other dev loop cycle from the right
 # location.)  I'm going to leave this in for a little if only because it's an
 # interesting edge case.
-nsCString:
-  kind: String
-  traverse:
-  - mData
+##nsCString:
+##  kind: String
+##  traverse:
+##  - mData
+
+### Security-ish stuff
+
+ContentPrincipal:
+  simple:
+  - mCodebase: true
+  - mOriginAttributes: true
+
+mozilla::OriginAttributes:
+  terse:
+  - mPrivateBrowsingId: true
+  - mUserContextId: true
+  - mFirstPartyDomain: true
 
 ### Necko-ish Stuff ###
 
@@ -58,6 +71,40 @@ mozilla::net::nsStandardURL:
   # for strings and terse bypasses it.
   simple:
   - mSpec: true
+
+mozilla::net::nsHttpRequestHead:
+  terse:
+  - mMethod: true
+
+mozilla::net::nsLoadGroup:
+  simple:
+  - mLoadFlags: true
+
+mozilla::net::LoadInfo:
+  simple:
+  - mLoadingPrincipal: true
+  - mOriginAttributes: true
+
+mozilla::net::HttpBaseChannel:
+  groups:
+  - overview:
+    - mRequestHead: true
+    - mURI: true
+  - context:
+    - mOriginalURI: true
+    - mDocumentURI: true
+  - load:
+    - mUploadStream: true
+    # should include somehow: mCorsMode, mRedirectMode, mFetchCacheMode
+    - mLoadFlags: true
+    - mLoadGroup: true
+    - mLoadInfo: true
+# TODO: address inheritance somehow; there are aspects of HttpChannelChild that
+# are interesting on their own.  We absolutely don't want to have to duplicate
+# most things.  explicit inheritance seems useful, although the more concise
+# the better.
+mozilla::net::HttpChannelChild: mozilla::net::HttpBaseChannel
+mozilla::net::nsHttpChannel: mozilla::net::HttpBaseChannel
 
 ### DOM IPC ###
 
@@ -94,10 +141,28 @@ mozilla::ipc::MessageChannel:
   - mChannelState: true
 
 
+### Core DOM ###
+
+nsHTMLDocument:
+  groups:
+  - URIs:
+    - mDocumentURI: true
+    - mOriginalURI: true
+  - state:
+    - mReadyState: true
+    - mVisibilityState: true
+    - mOnloadBlockCount: true
+    - mBFCacheEntry: true
+    - mIsThirdParty: true
+  - netish:
+    - mChannel: true
+  ##- perf:
+  ##  - mTiming: true
+  # for traversals?: mWindow,
+
 ### ServiceWorkers ###
 
-# This is all currently speculative.
-ServiceWorkerManager:
+mozilla::dom::workers::ServiceWorkerManager:
   groups:
   - registrations:
     - mRegistrationInfos: terse
@@ -107,7 +172,31 @@ ServiceWorkerManager:
   - interceptions:
     - mNavigationInterceptions: terse
   - startup:
-    - mActor: bool
+    # - mActor: bool
     - mPendingOperations: terse
   - debugging:
     - mListeners: type
+
+mozilla::dom::workers::ServiceWorkerManager::RegistrationDataPerPrincipal:
+  simple:
+  - mOrderedScopes: true
+  - mInfos: true
+
+mozilla::dom::workers::ServiceWorkerRegistrationInfo:
+  groups:
+  - state:
+    - mScope: true
+    - mUpdateState: true
+  - workers:
+    - mEvaluatingWorker: true
+    - mActiveWorker: true
+    - mWaitingWorker: true
+    - mInstallingWorker: true
+
+mozilla::dom::workers::ServiceWorkerInfo:
+  simple:
+  - mScope: true
+  - mScriptSpec: true
+  - mState: true
+  - mSkipWaitingFlag: true
+  - mHandlesFetch: true
