@@ -16,6 +16,20 @@ UniquePtr:
     - mTuple
     - mFirstA
 
+### Other MFBT Fancy Stuff ###
+
+mozilla::Atomic:
+  kind: Atomic Wrapper
+  traverse:
+    - mValue
+    # XXX/disclaimer: this is the (gcc) std::atomic's implementation fields that
+    # we pierce.  If we only did mValue, we end up (for the nsresult case)
+    # mozilla::detail::AtomicBase<nsresult, (mozilla::MemoryOrdering)1>::ValueType
+    # which clearly can be pierced more, but it's not clear that we need a magic
+    # template piercing heuristic for this yet.  Presumably we'll need that when
+    # I start building under clang again?
+    - _M_i
+
 ### XPCOM-ish stuff ###
 nsAutoRefCnt:
   kind: RefCount
@@ -23,6 +37,18 @@ nsAutoRefCnt:
   - mValue: true
   # Can this just be covered by the type name?
   - isThreadSafe: true
+
+nsThread:
+  simple:
+  - mThread: true
+  - mNestedEventLoopDepth: true
+  - mStackSize: true
+
+PRThread:
+  simple:
+  - name: true
+  - tid: true
+
 
 ### Containers ###
 
@@ -66,6 +92,38 @@ mozilla::OriginAttributes:
 
 ### Necko-ish Stuff ###
 
+LOAD_FLAGS:
+  bitflags:
+    zero: LOAD_NORMAL
+    bits:
+      # from nsIRequest.idl
+      # LOAD_NORMAL is a pure 0 value, covered above.
+      - LOAD_BACKGROUND: 0
+      - LOAD_HTML_OBJECT_DATA: 1
+      - LOAD_DOCUMENT_NEEDS_COOKIE: 2
+      - INHIBIT_CACHING: 7
+      - INHIBIT_PERSISTENT_CACHING: 8
+      - LOAD_BYPASS_CACHE: 9
+      - LOAD_FROM_CACHE: 10
+      - VALIDATE_ALWAYS: 11
+      - VALIDATE_NEVER: 12
+      - VALIDATE_ONCE_PER_SESSION: 13
+      - LOAD_ANONYMOUS: 14
+      - LOAD_FRESH_CONNECTION: 15
+      # from nsIChannel.idl
+      - LOAD_DOCUMENT_URI: 16
+      - LOAD_RETARGETED_DOCUMENT_URI: 17
+      - LOAD_REPLACE: 18
+      - LOAD_INITIAL_DOCUMENT_URI: 19
+      - LOAD_TARGETED: 20
+      - LOAD_CALL_CONTENT_SNIFFERS: 21
+      - LOAD_CLASSIFY_URI: 22
+      - LOAD_MEDIA_SNIFFER_OVERRIDES_CONTENT_TYPE: 23
+      - LOAD_EXPLICIT_CREDENTIALS: 24
+      - LOAD_BYPASS_SERVICE_WORKER: 25
+      # from nsICachingChannel.idl:
+
+
 mozilla::net::nsStandardURL:
   # XXX this wants to be terse, but we need to rely on the underlying printer
   # for strings and terse bypasses it.
@@ -78,7 +136,7 @@ mozilla::net::nsHttpRequestHead:
 
 mozilla::net::nsLoadGroup:
   simple:
-  - mLoadFlags: true
+  - mLoadFlags: LOAD_FLAGS
 
 mozilla::net::LoadInfo:
   simple:
@@ -90,13 +148,14 @@ mozilla::net::HttpBaseChannel:
   - overview:
     - mRequestHead: true
     - mURI: true
+    - mStatus: true
   - context:
     - mOriginalURI: true
     - mDocumentURI: true
   - load:
     - mUploadStream: true
     # should include somehow: mCorsMode, mRedirectMode, mFetchCacheMode
-    - mLoadFlags: true
+    - mLoadFlags: LOAD_FLAGS
     - mLoadGroup: true
     - mLoadInfo: true
 # TODO: address inheritance somehow; there are aspects of HttpChannelChild that
@@ -105,6 +164,38 @@ mozilla::net::HttpBaseChannel:
 # the better.
 mozilla::net::HttpChannelChild: mozilla::net::HttpBaseChannel
 mozilla::net::nsHttpChannel: mozilla::net::HttpBaseChannel
+
+nsStringInputStream:
+  simple:
+  - mData: true
+
+nsBufferedInputStream:
+  groups:
+  - stream:
+    - mStream: true
+  - buffer:
+    - mBufferSize: true
+    - mBufferDisabled: true
+    - mEOF: true
+    - mBufferStartOffset: true
+    - mCursor: true
+    - mFillPoint: true
+    - mGetBufferCount: true
+    - mBuffer: true
+
+
+
+nsMIMEInputStream:
+  simple:
+  - mHeaders: true
+  - mStream: true
+
+nsMultiplexInputStream:
+  simple:
+  - mCurrentStream: true
+  - mStartedReadingCurrent: true
+  - mStatus: true
+  - mStreams: true
 
 ### DOM IPC ###
 
@@ -140,6 +231,18 @@ mozilla::ipc::MessageChannel:
   - mName: true
   - mChannelState: true
 
+mozilla::dom::IPCBlobInputStream:
+  simple:
+  - mState: true
+  - mActor: true
+  - mRemoteStream: true
+mozilla::dom::IPCBlobInputStreamChild:
+  simple:
+  - mState: true
+  - mSize: true
+  - mOwningEventTarget: true
+  - mWorkerHolder: true
+  - mPendingOperations: true
 
 ### Core DOM ###
 

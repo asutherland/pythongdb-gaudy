@@ -21,6 +21,9 @@ dealing with things like char* and de-referencing breaks string printing."""
     if vtype.code == gdb.TYPE_CODE_PTR:
         derefed = val.dereference()
         dtype = derefed.type
+        # we may be dealing with typedefs now, for example, PRThread is
+        # "typedef struct PRThread PRThread", a common C idiom.
+        dtype = dtype.strip_typedefs()
         if (dtype.code == gdb.TYPE_CODE_STRUCT or
             dtype.code == gdb.TYPE_CODE_UNION):
            # TODO: maybe this is too simple?  There is TYPE_CODE_TYPEDEF, which
@@ -30,6 +33,18 @@ dealing with things like char* and de-referencing breaks string printing."""
             #pout('{s}not de-refing to %s from %s', dtype, vtype)
             pass
     return val
+
+def is_simple_type(vtype):
+    """Return true if the type is a simple native type or a typedef to one.  This
+is mainly used to figure out whether a type merits naming it or not, and perhaps
+whether it can/should be displayed inline.
+"""
+    vtype = vtype.strip_typedefs()
+
+    code = vtype.code
+    return (code == gdb.TYPE_CODE_INT or
+            code == gdb.TYPE_CODE_FLT or
+            code == gdb.TYPE_CODE_BOOL)
 
 class PrettyPrintCommand(gdb.Command):
     """A prettier version of the gdb "print" command that supports its own
@@ -81,6 +96,9 @@ Our driving goals, aware of the above are then:
         pout.v("{s}Traversing %s %s using steps %s",
                rule["kind"], tname, repr(steps))
 
+
+    def _log_bitflag_bits(self, raw_val, bit_pieces, tname):
+        pout("{n}%s {s}%x", ' '.join(bit_pieces), raw_val)
 
     def _log_enter_array(self, val, tname):
         # XXX We're in a weird place here for the identifying type when it comes
@@ -140,10 +158,12 @@ Our driving goals, aware of the above are then:
         pout.i(2)
 
     def _log_field_in_detailed_object(self, key, val, displayMode):
-        # XXX use displayMode
         pout("{k}%s{n}:", key)
         pout.i(2)
-        self._inspect(val)
+        explicit_type = None
+        if displayMode != 'true' and displayMode is not True:
+            explicit_type = displayMode
+        self._inspect(val, explicit_type)
         pout.i(-2)
 
     def _log_exit_object_group(self, groupName, rule):
@@ -203,6 +223,56 @@ Our driving goals, aware of the above are then:
                     i += 1
             finally:
                 self._log_exit_array(val, tname)
+
+    def _bitflags(self, val, rule, tname):
+        brule = rule["bitflags"]
+        zeroName = brule["zero"]
+        # get the underlying value and throw if the type is wrong.
+        val_bits = val | 0
+        # this could probably be optimized...
+        bit_pieces = []
+        for bitDef in brule["bits"]:
+            for bitName, bitPos in bitDef.items():
+                # we have to parse the bit every time, we didn't provide a
+                # specific mapping.
+                if (val_bits & (1 << int(bitPos))):
+                    bit_pieces.append(bitName)
+        self._log_bitflag_bits(val_bits, bit_pieces, tname)
+
+    def _print_enum(self, val, vtype, tname):
+        '''HACK Given an explicitly enumerated type, try and match the current value
+to one of the enumerated values.  This is really all about nsresult and the
+rules about enums and the underlying representing types.  gdb is totally able to
+understand that a 0 nsresult is `nsresult::NS_OK`, but it breaks as soon as the
+high order bit is flipped because it ends up seeing the underlying int type as
+int32_t but the constant is uint32_t.
+
+Even if the necessity of this check is addressed, it might make sense to keep a
+first-class understanding of enums so we can pretty print the namespaces.
+'''
+        # TODO: nsresult really demands caching...
+        # Because of enum rules about the representation type perhaps not
+        # being reflected into gdb or whatever, we end up seeing nsresult as a
+        # signed int32_t, so let's just cast over to unsigned before extracting
+        # out instead of doing bit twiddling.
+        try:
+            tsize = vtype.sizeof
+            if tsize <= 4:
+                val = val.cast(gdb.lookup_type('uint32_t'))
+            else:
+                val = val.cast(gdb.lookup_type('uint64_t'))
+            num_val = val + 0
+        except:
+            # maybe we don't have those typedefs?  bollocks.  whatever.
+            pass
+
+        for field in vtype.fields():
+            #pout('{s}checking %s %x', field.name, field.enumval)
+            if field.enumval == num_val:
+                # XXX use a logger that maybe prints the namespace as {s}
+                pout('{n}%s', field.name)
+                return
+        pout('{s}unknown enum value {n}%x', num_val)
 
     def _print_terse(self, val, rule, tname):
         # XXX need to figure out the UX of this a bit more.  It seems like
@@ -266,40 +336,61 @@ Our driving goals, aware of the above are then:
                 pout("{e}Exception inspecting: %s", e)
         self._log_exit_map(val, tname)
 
-    def _inspect(self, val):
+    def _inspect(self, val, explicit_type=None):
+        '''explicit_type is currently the "displayMode" from when we normally do
+"fieldName: true".  It's being introduced to support bitflag mappings for what
+are just uint32_t's as far as the source is concerned.  We use the explicit type
+to key like it was a normal type.  For bitflags thus far, this could be a
+separate namespace, and since we wouldn't want all extra definitions like this
+to be inline, it does make sense to just have it be a name that calls out.
+We'll see.  This all wants to be cleaner anyways.  Let's just finish exploring
+the feature space.
+'''
+        vtype = val.type
+        #pout("!!vtype: %s %s %s %s", vtype, type(vtype), vtype.tag, type(vtype.tag))
+
         # pierce pointers.  Note that our caller may themselves have invoked
         # maybe_deref, so this could get weird.
         val = maybe_deref(val)
 
-        # figure out the type; we want to use RTTI if available to downcast all
-        # the way.
-        vtype = val.dynamic_type
-        # that may have given us a better type, let's re-cast the value too.
-        try:
-            val = val.cast(vtype)
-        except:
-            pass
+        vtype = val.type
+        #pout("!vtype: %s %s %s %s", vtype, type(vtype), vtype.tag, type(vtype.tag))
 
-        # we may be a pointer type or other simple type.  In particular, we may
-        # be a char*-type thing.  punt to gdb. for now.
-        if vtype.name is None:
-            # XXX gdb presents strings as `0xNNNN "foo bar"` in a single string
-            # which breaks our pretty schema.
-            pout("{n}%s", str(val))
-            return
-
-        #pout("vtype: %s %s %s %s", vtype, type(vtype), vtype.tag, type(vtype.tag))
-        tmatch = RE_TEMPLATE_NAME.match(vtype.name)
-        if tmatch:
-            # it was a template!
-            tname = tmatch.group(1)
+        vtype = None
+        if explicit_type is not None:
+            tname = explicit_type
+            rule = self.mapping.get(explicit_type)
         else:
-            tname = vtype.name
+            # figure out the type; we want to use RTTI if available to downcast all
+            # the way.
+            vtype = val.dynamic_type
+            # that may have given us a better type, let's re-cast the value too.
+            try:
+                val = val.cast(vtype)
+            except:
+                pass
 
-        # check if we have a configuration mapping for the type
-        #pout("looking up %s in...", tname)
-        #pout("%s", repr(self.mapping))
-        rule = self.mapping.get(tname)
+            # we may be a pointer type or other simple type.  In particular, we may
+            # be a char*-type thing.  punt to gdb. for now.
+            if vtype.name is None:
+                # XXX gdb presents strings as `0xNNNN "foo bar"` in a single string
+                # which breaks our pretty schema.
+                pout("{n}%s", str(val))
+                return
+
+            #pout("vtype: %s %s %s %s", vtype, type(vtype), vtype.tag, type(vtype.tag))
+            tmatch = RE_TEMPLATE_NAME.match(vtype.name)
+            if tmatch:
+                # it was a template!
+                tname = tmatch.group(1)
+            else:
+                tname = vtype.name
+
+            # check if we have a configuration mapping for the type
+            #pout("looking up %s in...", tname)
+            #pout("%s", repr(self.mapping))
+            rule = self.mapping.get(tname)
+
         if rule:
             # if this was an alias, pierce itgdbvis
             if isinstance(rule, str):
@@ -309,6 +400,8 @@ Our driving goals, aware of the above are then:
                 self._traverse(val, rule, tname)
             elif "iterate" in rule:
                 self._iterate(val, rule, tname)
+            elif "bitflags" in rule:
+                self._bitflags(val, rule, tname)
             elif "terse" in rule:
                 self._print_terse(val, rule, tname)
             elif "simple" in rule:
@@ -321,6 +414,18 @@ Our driving goals, aware of the above are then:
             # Handled or errored appropriately, no need to fall through to the
             # default visualizer.
             return
+
+        # check for heuristic stuff
+        if vtype:
+            # handle enums
+            if vtype.code == gdb.TYPE_CODE_ENUM:
+                self._print_enum(val, vtype, tname)
+                return
+            # just print simple types without complaining about mappings.
+            if is_simple_type(vtype):
+                pout("{n}%s", str(val))
+                return
+
 
         vis = gdb.default_visualizer(val)
         if vis and hasattr(vis, 'children'):

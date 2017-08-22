@@ -50,6 +50,11 @@ Then you can use:
 That's right, by reading this far, you've earned the right to help develop these
 further!
 
-Python has built-in reloading, so you can do the following:
+Python has built-in reloading, so after you make sure you have the following in
+your `.gdbinit `:
+```
+python from imp import reload
+```
+...you can do the following:
 - `python reload(gdbaudy.bt)`
 - `python reload(gdbaudy.pp)`
