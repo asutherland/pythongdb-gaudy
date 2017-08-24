@@ -197,6 +197,17 @@ nsMultiplexInputStream:
   - mStatus: true
   - mStreams: true
 
+nsStorageInputStream:
+  simple:
+  - mStorageStream: true
+  - mStatus: true
+  # the cursors and such are dumb, forget them.
+
+nsStorageStream:
+  simple:
+  - mLogicalLength: true
+  - mSegmentedBuffer: true
+
 ### DOM IPC ###
 
 mozilla::dom::IdType:

@@ -9,7 +9,7 @@ RE_TEMPLATE_NAME = re.compile("^([^<]+)<.*>$")
 
 def maybe_deref(val, vtype=None):
     """Given a value that may be of a pointer to a struct-ish type, dereference
-it if it is.
+it if it is.  Also pierce references.  References are so wacky!
 
 For use in pretty-printing container scenarios where the value types are
 frequently pointers.  We intentionally avoid de-referencing in cases where we're
@@ -18,8 +18,9 @@ dealing with things like char* and de-referencing breaks string printing."""
         return val
     if not vtype:
         vtype = val.type
-    if vtype.code == gdb.TYPE_CODE_PTR:
-        derefed = val.dereference()
+    if (vtype.code == gdb.TYPE_CODE_PTR or
+        vtype.code == gdb.TYPE_CODE_REF):
+        derefed = val.referenced_value()
         dtype = derefed.type
         # we may be dealing with typedefs now, for example, PRThread is
         # "typedef struct PRThread PRThread", a common C idiom.
@@ -293,8 +294,11 @@ first-class understanding of enums so we can pretty print the namespaces.
         self._log_enter_detailed_object(val, rule, tname)
         for fieldDef in rule["simple"]:
             for fieldName, displayMode in fieldDef.items():
-                self._log_field_in_detailed_object(fieldName, val[fieldName],
-                                                   displayMode)
+                try:
+                    self._log_field_in_detailed_object(fieldName, val[fieldName],
+                                                       displayMode)
+                except Exception as e:
+                    pout("{e}Exception inspecting field %s: %s", fieldName, e)
         self._log_exit_detailed_object(val, rule, tname)
 
     def _print_groups(self, val, rule, tname):
@@ -307,8 +311,11 @@ first-class understanding of enums so we can pretty print the namespaces.
 
                 for fieldDef in fieldDefs:
                     for fieldName, displayMode in fieldDef.items():
-                        self._log_field_in_detailed_object(fieldName, val[fieldName],
-                                                           displayMode)
+                        try:
+                            self._log_field_in_detailed_object(fieldName, val[fieldName],
+                                                               displayMode)
+                        except Exception as e:
+                            pout("{e}Exception inspecting field %s: %s", fieldName, e)
 
                 self._log_exit_object_group(groupName, rule)
         self._log_exit_detailed_object(val, rule, tname)
