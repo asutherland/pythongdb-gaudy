@@ -5,6 +5,10 @@ swm:
   name: ServiceWorkerManager
   singleton: mozilla::dom::workers::gInstance
 
+swms:
+  name: ServiceWorkerManagerService
+  singleton: mozilla::dom::workers::(anonymous namespace)::sInstance
+
 procs:
   name: ContentParents
   singleton: mozilla::dom::ContentParent::sContentParents

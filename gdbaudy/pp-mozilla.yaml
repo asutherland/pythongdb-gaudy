@@ -208,6 +208,15 @@ nsStorageStream:
   - mLogicalLength: true
   - mSegmentedBuffer: true
 
+nsPipeOutputStream:
+  simple:
+  # this probably needs / wants hierarchy awareness, or at least for us to have
+  # loop detection if we want to add a binding for nsPipe that allows it to
+  # reference the output streams.
+  - mPipe: true
+  - mBlocking: true
+  - mBlocked: true
+
 ### DOM IPC ###
 
 mozilla::dom::IdType:
@@ -241,6 +250,7 @@ mozilla::ipc::MessageChannel:
   terse:
   - mName: true
   - mChannelState: true
+  - mPeerPid: true
 
 mozilla::dom::IPCBlobInputStream:
   simple:
@@ -275,6 +285,16 @@ nsHTMLDocument:
   # for traversals?: mWindow,
 
 ### ServiceWorkers ###
+
+mozilla::dom::workers::ServiceWorkerManagerService:
+  simple:
+    - mAgents: true
+    - mPendingUpdaterActors: true
+
+mozilla::dom::workers::ServiceWorkerManagerParent:
+  simple:
+    - mChannel: true
+    - mID: true
 
 mozilla::dom::workers::ServiceWorkerManager:
   groups:
