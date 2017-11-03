@@ -72,10 +72,15 @@ mozilla::LinkedList:
 # printers.  (I've been doing most of my other dev loop cycle from the right
 # location.)  I'm going to leave this in for a little if only because it's an
 # interesting edge case.
-##nsCString:
-##  kind: String
-##  traverse:
-##  - mData
+# XXX actually... this happened to me again, and I was in the right spot...
+nsCString:
+  kind: String
+  traverse:
+  - mData
+# XXX not sure these are needed though...
+##nsTSubstring: nsCString
+##nsSubstring: nsCString
+##nsString: nsCString
 
 ### Security-ish stuff
 
@@ -130,6 +135,25 @@ mozilla::net::nsStandardURL:
   simple:
   - mSpec: true
 
+mozilla::net::nsNestedAboutURI: mozilla::net::nsSimpleNestedURI
+mozilla::net::nsSimpleNestedURI:
+  simple:
+  - mInnerURI: true
+  # these come from nsSimpleURI and should be inherited
+  - mScheme: true
+  - mPath: true
+  - mRef: true
+  - mQuery: true
+  - mMutable: true
+mozilla::net::nsSimpleURI:
+  simple:
+  - mScheme: true
+  - mPath: true
+  - mRef: true
+  - mQuery: true
+  - mMutable: true
+
+
 mozilla::net::nsHttpRequestHead:
   terse:
   - mMethod: true
@@ -164,6 +188,27 @@ mozilla::net::HttpBaseChannel:
 # the better.
 mozilla::net::HttpChannelChild: mozilla::net::HttpBaseChannel
 mozilla::net::nsHttpChannel: mozilla::net::HttpBaseChannel
+
+mozilla::net::nsInputStreamChannel:
+  groups:
+  - overview:
+    - mContentType: true
+    - mContentCharset: true
+    - mURI: true
+    - mStatus: true
+    - mLoadFlags: LOAD_FLAGS
+  - properties:
+    - mPropertyHash: true
+  - details:
+    - mLoadGroup: true
+    - mLoadInfo: true
+    - mAllowThreadRetargeting: true
+    - mRedirectFlags: true
+  - content:
+    - mWasOpened: true
+    - mContentLength: true
+    - mSrcdocData: true
+    - mContentStream: true
 
 nsStringInputStream:
   simple:
