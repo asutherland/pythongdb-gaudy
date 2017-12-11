@@ -78,9 +78,9 @@ nsCString:
   traverse:
   - mData
 # XXX not sure these are needed though...
-##nsTSubstring: nsCString
-##nsSubstring: nsCString
-##nsString: nsCString
+nsTSubstring: nsCString
+nsSubstring: nsCString
+nsString: nsCString
 
 ### Security-ish stuff
 
@@ -93,7 +93,8 @@ mozilla::OriginAttributes:
   terse:
   - mPrivateBrowsingId: true
   - mUserContextId: true
-  - mFirstPartyDomain: true
+  # comment out until I fix the terse nesting; as-is we do the full screwed up gdb nested print
+  ##- mFirstPartyDomain: true
 
 ### Necko-ish Stuff ###
 
@@ -135,6 +136,7 @@ mozilla::net::nsStandardURL:
   simple:
   - mSpec: true
 
+mozilla::net::SubstitutingURL: mozilla::net::nsStandardURL
 mozilla::net::nsNestedAboutURI: mozilla::net::nsSimpleNestedURI
 mozilla::net::nsSimpleNestedURI:
   simple:
@@ -277,6 +279,27 @@ mozilla::dom::ContentParent:
   terse:
   - mRemoteType: true
   - mOtherPid: true
+
+mozilla::dom::TabChild:
+  simple:
+  - mWebNav: true
+
+# nsWebBrowser and nsDocShell are here for the tabchild case, but should be moved.
+nsWebBrowser:
+  simple:
+  - mOriginAttributes: true
+  - mDocShell: true
+
+nsDocShell:
+  groups:
+  - desc:
+    - mCurrentURI: true
+    - mPrivateBrowsingId: true
+    - mOriginAttributes: true
+    - mTitle: true
+  - load:
+    - mLoadGroup: true
+
 
 mozilla::dom::ContentProcessManager:
   simple:

@@ -13,6 +13,18 @@ procs:
   name: ContentParents
   singleton: mozilla::dom::ContentParent::sContentParents
 
+contentchild:
+  name: ContentChild Singleton
+  singleton: mozilla::dom::ContentChild::sSingleton
+
+tabchildren:
+  name: TabChildren
+  singleton: sTabChildren
+
 cpm:
   name: ContentProcessManager
   singleton: mozilla::dom::ContentProcessManager::sSingleton
+
+sas:
+  name: StorageActivityService
+  singleton: mozilla::dom::gStorageActivityService
