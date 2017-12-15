@@ -29,14 +29,22 @@ mozilla::Atomic:
     # template piercing heuristic for this yet.  Presumably we'll need that when
     # I start building under clang again?
     - _M_i
+std::atomic:
+  kind: Atomic Wrapper
+  traverse:
+  - _M_i
+
 
 ### XPCOM-ish stuff ###
 nsAutoRefCnt:
   kind: RefCount
-  terse:
+  # XXX this really wants to be terse, but current output limitations mean we
+  # need to be simple to avoid mozilla::Atomic from getting gdb chatty
+  simple:
   - mValue: true
   # Can this just be covered by the type name?
   - isThreadSafe: true
+mozilla::ThreadSafeAutoRefCnt: nsAutoRefCnt
 
 nsThread:
   simple:
@@ -351,6 +359,34 @@ nsHTMLDocument:
   ##- perf:
   ##  - mTiming: true
   # for traversals?: mWindow,
+
+### IndexedDB ###
+
+mozilla::dom::indexedDB::(anonymous namespace)::FileInfoImpl:
+  groups:
+  - info:
+    - mFileManager: true
+    - mFileId: true
+  - counts:
+    - mRefCnt: true
+    - mDBRefCnt: true
+    - mSliceRefCnt: true
+
+mozilla::dom::indexedDB::FileManager:
+  groups:
+  - origin:
+    - mPersistenceType: true
+    - mGroup: true
+    - mOrigin: true
+  - info:
+    - mDatabaseName: true
+    - mDirectoryPath: true
+    - mJournalDirectoryPath: true
+  - fileIds:
+    - mLastFileId: true
+    # Commenting out because of recursion; need up/down direction awareness
+    # - mFileInfos: true
+
 
 ### ServiceWorkers ###
 
