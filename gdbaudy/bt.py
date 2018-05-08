@@ -28,7 +28,8 @@ import os.path
 import itertools
 
 class ContextHelper(object):
-    def __init__(self, frameHelpers=[]):
+    def __init__(self, frameHelpers=[], fancyDetails=False):
+        self.fancyDetails = fancyDetails
         self.pathCounts = {}
         self.seenValues = {}
         self.interestingValues = {}
@@ -132,7 +133,7 @@ class ColorFrameWrapper(object):
             block = self.block = self.frame.block()
         except:
             pass
-        if block:
+        if block and self.context.fancyDetails:
             # if this is a locals frame, jump up to the args frame...
             if block.function is None:
                 block = block.superblock
@@ -324,6 +325,7 @@ Use of the 'paste' qualifier generates output suitable for pasting in bugzilla.
         count = 0
         filter = True
         mode = MODE_NORMAL
+        fancyDetails = True
 
         for word in arg.split (" "):
             if word == '':
@@ -334,14 +336,16 @@ Use of the 'paste' qualifier generates output suitable for pasting in bugzilla.
                 mode = MODE_FULL
             elif word == 'terse':
                 mode = MODE_TERSE
+                fancyDetails = False
             elif word == 'paste':
                 mode = MODE_PASTE
+                fancyDetails = False
             else:
                 count = int (word)
 
         # FIXME: provide option to start at selected frame
         # However, should still number as if starting from newest
-        context = ContextHelper()
+        context = ContextHelper(fancyDetails=fancyDetails)
 
         frames = []
         iterFrames = None
