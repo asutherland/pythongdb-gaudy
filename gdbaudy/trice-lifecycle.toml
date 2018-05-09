@@ -1,0 +1,13 @@
+[trace."nsGlobalWindowInner::FreeInnerObjects"]
+capture = [
+  ["mDoc", "mDocumentURI", "mSpec"],
+  ["mDoc", "mDocumentURI", "mScheme", "mData"],
+  ["mDoc", "mDocumentURI", "mPath", "mData"],
+]
+
+[trace."nsAppStartup::CloseAllWindows"]
+
+[trace."nsAppStartup::Quit"]
+capture = [
+  ["aMode"],
+]

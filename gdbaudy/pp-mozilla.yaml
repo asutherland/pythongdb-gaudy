@@ -57,6 +57,16 @@ PRThread:
   - name: true
   - tid: true
 
+# This absolutely needs its own pretty-printer, or some kind of hacky helper
+# logic to regex from nsIDataType's VTYPE_BLAH into picking the right mBlah
+# entry in the union.
+#
+# For now, just only provide the type so the output isn't like 20 pages.
+nsVariant:
+  kind: nsVariant
+  traverse:
+  - mData
+  - mType
 
 ### Containers ###
 
@@ -89,6 +99,9 @@ nsCString:
 nsTSubstring: nsCString
 nsSubstring: nsCString
 nsString: nsCString
+# currently absolutely needed...
+nsAutoCString: nsCString
+nsACString: nsCString
 
 ### Security-ish stuff
 
@@ -103,6 +116,24 @@ mozilla::OriginAttributes:
   - mUserContextId: true
   # comment out until I fix the terse nesting; as-is we do the full screwed up gdb nested print
   ##- mFirstPartyDomain: true
+
+### Image Stuff ###
+
+# For my debugging, currently arriving at this via nsDataChannel's mListener with
+# the ProxyListener being pierced.  Because there's no cycle prevention yet, we
+# need to avoid including mRequest.  Also lots of load-related things are
+# redundant given the outer scope (more enhancements needed here), so this really
+# opts for terseness.
+imgRequest:
+  simple:
+  - mURI: true
+
+# This is an off-main-thread subset of nsStandardURL.
+mozilla::image::ImageURL:
+  simple:
+  - mSpec: true
+  - mScheme: true
+  - mRef: true
 
 ### Necko-ish Stuff ###
 
@@ -136,6 +167,12 @@ LOAD_FLAGS:
       - LOAD_EXPLICIT_CREDENTIALS: 24
       - LOAD_BYPASS_SERVICE_WORKER: 25
       # from nsICachingChannel.idl:
+      - LOAD_NO_NETWORK_IO: 26
+      - LOAD_CHECK_OFFLINE_CACHE: 27
+      - LOAD_BYPASS_LOCAL_CACHE: 28
+      - LOAD_BYPASS_LOCAL_CACHE_IF_BUSY: 29
+      - LOAD_ONLY_FROM_CACHE: 30
+      - LOAD_ONLY_IF_MODIFIED: 31
 
 
 mozilla::net::nsStandardURL:
@@ -165,8 +202,28 @@ mozilla::net::nsSimpleURI:
 
 
 mozilla::net::nsHttpRequestHead:
-  terse:
+  simple:
   - mMethod: true
+
+mozilla::net::nsHttpResponseHead:
+  simple:
+  - mHeaders: true
+  # these should also be in the headers
+  - mContentType: true
+  - mContentCharset: true
+
+mozilla::net::nsHttpHeaderArray:
+  simple:
+  - mHeaders: true
+mozilla::net::nsHttpHeaderArray::nsEntry:
+  simple:
+  - header: true
+  - value: true
+mozilla::net::nsHttpAtom:
+  kind: nsHttpAtom
+  traverse:
+  - _val
+  
 
 mozilla::net::nsLoadGroup:
   simple:
@@ -180,8 +237,9 @@ mozilla::net::LoadInfo:
 mozilla::net::HttpBaseChannel:
   groups:
   - overview:
-    - mRequestHead: true
     - mURI: true
+    - mRequestHead: true
+    - mResponseHead: true
     - mStatus: true
   - context:
     - mOriginalURI: true
@@ -198,6 +256,55 @@ mozilla::net::HttpBaseChannel:
 # the better.
 mozilla::net::HttpChannelChild: mozilla::net::HttpBaseChannel
 mozilla::net::nsHttpChannel: mozilla::net::HttpBaseChannel
+
+# creating for DataChannelChild.  This is basically the same as HttpBaseChannel
+# as far as we're concerned, despite the lack of inheritance overlap.
+nsDataChannel:
+  groups:
+  - overview:
+    - mURI: true
+    - mContentType: true
+    - mContentCharset: true
+    - mContentLength: true
+    - mStatus: true
+  - context:
+    - mOriginalURI: true
+  - load:
+    - mLoadFlags: LOAD_FLAGS
+    - mLoadGroup: true
+    - mLoadInfo: true
+  - consumers:
+    - mListener: true
+    
+mozilla::net::DataChannelChild: nsDataChannel
+
+ProxyListener:
+  simple:
+  - mDestListener: true
+
+mozilla::net::NeckoParent:
+  simple:
+  - mChannel: true
+
+mozilla::net::HttpChannelParent:
+  groups:
+  - overview:
+    - mChannel: true
+    - mStatus: true
+  - ipc:
+    - mManager: true
+    # mChannel off of PHttpChannelParent gets shadowed by the explicit mChannel
+    - mIPCClosed: true
+  - intercept:
+    - mPendingDiversion: true
+    - mDivertingFromChild: true
+    - mDivertedOnStartRequest: true
+    - mSuspendedForDiversion: true
+    - mSuspendAfterSynthesizeResponse: true
+    - mWillSynthesizeResponse: true
+
+# this alias is useful, but we really want to subclass our defs for basechannel
+mozilla::net::InterceptedHttpChannel: mozilla::net::HttpBaseChannel
 
 mozilla::net::nsInputStreamChannel:
   groups:
@@ -342,6 +449,15 @@ mozilla::dom::IPCBlobInputStreamChild:
   - mPendingOperations: true
 
 ### Core DOM ###
+
+nsGlobalWindowInner:
+  groups:
+  - doc:
+    - mDoc: true
+    - mDocumentURI: true
+  - focus:
+    - mHasFocus: true
+    - mNeedsFocus: true
 
 nsHTMLDocument:
   groups:
