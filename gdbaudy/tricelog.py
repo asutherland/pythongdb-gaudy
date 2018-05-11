@@ -1,13 +1,34 @@
 import gdb
 import json
 import os.path
+import re
 import sys
 import toml
 import traceback
 
+from gdb.FrameIterator import FrameIterator
+
+RE_IS_GECKO = re.compile('^(gecko|mozilla)')
+def normalize_path(path):
+    '''
+    Naive (compared to ColorFilteringBacktrace's logic) path normalization logi
+    to provide paths relative to the source-tree root.
+    '''
+    if not path:
+        return path
+
+    parts = path.split(os.path.sep)
+    for iPart, part in enumerate(parts):
+        if RE_IS_GECKO.match(part):
+            return os.path.setp.join(parts[iPart+1:])
+    return path
+
 
 # XXX heuristic smart-pointer piercing. in pp this comes from the yaml
-# knowledge-base.  Here we just pierce any mRawPtr we see.  So fancy!
+# knowledge-base.  Here we just pierce any mRawPtr we see.  Note that gdb seems
+# clever enough to pierce smart pointers for its normal syntax, so I'm presuming
+# it either has its own heuristics or it leverages the explicit operator* or
+# operator-> overloads.  (It's _not_ coming from the gecko pretty printers.)
 def maybe_pierce(val):
     try:
         return maybe_deref(val['mRawPtr'])
@@ -63,13 +84,34 @@ def execExtractInsideParens(cmd):
     return s[idxOpen+1:idxClose]
 
 
-def magic_capture(traverseSeq, verbose=False):
+def magic_capture(traverseSeq, verbose=False, stringify=True):
+    '''
+    Capture helper that takes a list of fields to traverse, stringifying the
+    final value when all fields have been traversed.
+
+    traversSeq can either entirely consist of string values, starting from the
+    implicit frame context.  Alternately, the first element in the sequence
+    can be:
+    - A gdb.Value which will be used as the starting value.
+    - A gdb.Frame which will be used as the starting value with the next string
+      being passed to read_var before resuming normal traversal.
+    '''
     try:
         # traversal is currently hackily derived from the "pp" command's
         # traverse logic.  This all wants to be cleaned up.
-        name = traverseSeq[0]
+        thing = traverseSeq[0]
+        traverseFrom = 1
 
-        cur = gdb.parse_and_eval(name)
+        if isinstance(thing, gdb.Value):
+            cur = thing
+            name = '(value)'
+        elif isinstance(name, gdb.Frame):
+            cur = thing.read_var(traverseSeq[1])
+            name = '(frame)'
+            traverseFrom = 2
+        else:
+            name = thing
+            cur = gdb.parse_and_eval(thing)
         cur = maybe_deref(cur)
 
         # figure out the type; we want to use RTTI if available to downcast all
@@ -81,7 +123,7 @@ def magic_capture(traverseSeq, verbose=False):
         except:
             pass
 
-        for thing in traverseSeq[1:]:
+        for thing in traverseSeq[traverseFrom:]:
             name += '.' + thing
             cur = cur[thing]
             # (don't try and dereference a null pointer)
@@ -100,8 +142,12 @@ def magic_capture(traverseSeq, verbose=False):
             except:
                 pass
 
-
-        return name, str(cur)
+        if stringify:
+            # Note that this is different than doing value.string() which is
+            # only for actual strings.  By doing str(), we'll actually get
+            # `0xPOINTER "string contents"`.
+            cur = str(cur)
+        return name, cur
     except:
         if verbose:
             print('problem evaluating traversal:')
@@ -118,25 +164,48 @@ class LoggingBreakpoint(gdb.Breakpoint):
         data = {}
 
         ## RR replay sourced info
-        data['_event'] = execExtractPostColon('when')
-        data['_tick'] = execExtractPostColon('when-ticks')
-        data['_tid'] = execExtractPostColon('when-tid')
-        data['_time'] = execExtractPostColon('elapsed-time', float)
+        data['event'] = execExtractPostColon('when')
+        data['tick'] = execExtractPostColon('when-ticks')
+        data['tid'] = execExtractPostColon('when-tid')
+        data['time'] = execExtractPostColon('elapsed-time', float)
 
         ## get the thread name.
         # This is a little circumspect because the InferiorThread.name currently
         # isn't populated by rr, but it is provided as the thread's "extra".
         # And we can use "info thread" to retrieve it.
         tnum = gdb.selected_thread().num
-        data['_tname'] = execExtractInsideParens('info thread ' + str(tnum))
+        data['tname'] = execExtractInsideParens('info thread ' + str(tnum))
 
-        data['_spec'] = self.info['spec']
+        data['spec'] = self.info['spec']
 
         if self.info.get('capture'):
+            captured = data['captured'] = {}
             for traverseSeq in self.info['capture']:
                 name, value = magic_capture(traverseSeq)
                 if name is not None:
-                    data[name] = value
+                    captured[name] = value
+
+        if self.info.get('stack'):
+            frames = data['stack'] = []
+            for frame in FrameIterator(gdb.newest_frame()):
+                sal = frame.find_sal()
+                name = frame.name()
+
+                if not name or (not sal.symtab or not sal.symtab.filename):
+                    lib = gdb.solib_name (pc)
+
+                frames.append({
+                    'name' : name,
+                    'file': sal.symtab and normalize_path(sal.symtab.filename),
+                    'line' : sal.line,
+                    })
+
+        if self.info.get('jsstack'):
+            ensure_jsstack_hooked()
+            # invoke for side-effect, not return value.  note that this will
+            # print stuff out, we don't stop the output.
+            gdb.execute('call DumpJSStack()', to_string=True)
+            data['jsstack'] = magic_extracted_values['jsstack']
 
         return data
 
@@ -196,7 +265,7 @@ class TriceLogCommand(gdb.Command):
         else:
             print('Commands are: load, logto, closelog')
 
-TriceLogCommand()
+tlc = TriceLogCommand()
 
 # Tool to help test the capture logic manually.  The capture logic is a cut down
 # version of pp.py that aspires to be fancier.
@@ -205,8 +274,74 @@ class TriceCaptureTester(gdb.Command):
         gdb.Command.__init__(self, 'tcaptest', gdb.COMMAND_NONE)
 
     def invoke(self, arg, from_tty):
+        if arg == 'jsstack':
+            jscx = gdb.parse_and_eval('nsContentUtils::GetCurrentJSContext()')
+            print(jscx)
+            jsstack = gdb.parse_and_eval('JS::FormatStackDump((JSContext*)0x7f52cf923000, nullptr, true, true, false)')
+            return
+
         args = eval(arg)
         print('traversal is:', repr(args))
         print(repr(magic_capture(args, True)))
 
-TriceCaptureTester()
+tct = TriceCaptureTester()
+
+def capture_js_stack():
+    '''
+    Hacky JS Stack capturing built around dubiously using gdb's function
+    call magic.  The main reason this is hacky is that we need to invoke
+    JS::FormatStackDump which takes a JS::UniqueChars via move reference.  All
+    the notable callers pass a nullptr which gets default constructed and then
+    the callee can ignore it.  To make gdb happy we have to provide a pointer to
+    a memory location with a null pointer.
+
+    We can't just use DumpJSStack() because:
+    - Currently it only uses a 2k internal buffer.  (A template avoids stack
+      corruption; one just ends up with truncastion.)
+    - The bigger issue is our inability to easily intercept the stdio.  There
+      may be a way to do it, but we're also assuming that rr is involved, and
+      GDB itself doesn't seem to have an easy way to address the problem even
+      if rr wasn't wrapping.  (rr doesn't seem to have an existing gdb pipe for
+      this info, but it's possible one can be added).
+    - Using a breakpoint inside a call we issue doesn't work because
+      gdb.parse_and_eval will throw an exception when the breakpoint triggers,
+      so just intercepting DumpJSStack doesn't work as an automated process.
+      Note that I haven't looked deeply into whether there are flags that can
+      be used here to avoid this behavior, but from a what's-on-the-stack
+      invariant, the nested breakpoint fundamentally is re-entrancy/a nested
+      event loop, which is obviously not appealing to most run-times.
+    '''
+    # create an empty JS::UniqueChars zeroed allocation.
+    ucSize = gdb.parse_and_eval('sizeof(JS::UniqueChars)')
+    emptyUniqueChars = gdb.parse_and_eval('calloc(' + str(ucSize) + ', 1)')
+
+    # get the JSContext
+    jscx = gdb.parse_and_eval('nsContentUtils::GetCurrentJSContext()')
+
+    # dump the stack
+    # TODO: not leak this.  We just need to pierce to the pointer and free it.
+    jsstack = gdb.parse_and_eval(
+                  'JS::FormatStackDump((JSContext*)' + str(jscx) + ', ' +
+                  '*(JS::UniqueChars *)' + str(emptyUniqueChars) + ', ' +
+                  'true, true, false)')
+
+    # free the allocated memory
+    gdb.parse_and_eval('free((void *)' + str(emptyUniqueChars) + ')')
+
+    # extract the string
+    print(jsstack)
+    name, stackstr = magic_capture([jsstack, 'mTuple', 'mFirstA'],
+                                   verbose=True, stringify=False)
+    return stackstr.string()
+
+
+class PrettyJSStack(gdb.Command):
+
+    def __init__(self):
+        gdb.Command.__init__(self, 'pjsstack', gdb.COMMAND_NONE)
+
+    def invoke(self, arg, from_tty):
+        stackstr = capture_js_stack()
+        print(stackstr)
+
+PrettyJSStack()

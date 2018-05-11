@@ -4,10 +4,14 @@ capture = [
   ["mDoc", "mDocumentURI", "mScheme", "mData"],
   ["mDoc", "mDocumentURI", "mPath", "mData"],
 ]
+stack = true
 
 [trace."nsAppStartup::CloseAllWindows"]
+stack = true
 
 [trace."nsAppStartup::Quit"]
 capture = [
   ["aMode"],
 ]
+stack = true
+jsstack = true
