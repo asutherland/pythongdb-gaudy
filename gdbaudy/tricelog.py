@@ -20,7 +20,7 @@ def normalize_path(path):
     parts = path.split(os.path.sep)
     for iPart, part in enumerate(parts):
         if RE_IS_GECKO.match(part):
-            return os.path.setp.join(parts[iPart+1:])
+            return os.path.sep.join(parts[iPart+1:])
     return path
 
 
@@ -105,7 +105,7 @@ def magic_capture(traverseSeq, verbose=False, stringify=True):
         if isinstance(thing, gdb.Value):
             cur = thing
             name = '(value)'
-        elif isinstance(name, gdb.Frame):
+        elif isinstance(thing, gdb.Frame):
             cur = thing.read_var(traverseSeq[1])
             name = '(frame)'
             traverseFrom = 2
@@ -192,7 +192,7 @@ class LoggingBreakpoint(gdb.Breakpoint):
                 name = frame.name()
 
                 if not name or (not sal.symtab or not sal.symtab.filename):
-                    lib = gdb.solib_name (pc)
+                    lib = gdb.solib_name(frame.pc())
 
                 frames.append({
                     'name' : name,
@@ -201,11 +201,7 @@ class LoggingBreakpoint(gdb.Breakpoint):
                     })
 
         if self.info.get('jsstack'):
-            ensure_jsstack_hooked()
-            # invoke for side-effect, not return value.  note that this will
-            # print stuff out, we don't stop the output.
-            gdb.execute('call DumpJSStack()', to_string=True)
-            data['jsstack'] = magic_extracted_values['jsstack']
+            data['jsstack'] = capture_js_stack()
 
         return data
 
@@ -231,6 +227,14 @@ class TriceLogCommand(gdb.Command):
         with open(path) as f:
             data = toml.load(f)
 
+        # automatically open a log file if one's not open, based on the config.
+        if data.get('default_log_prefix') and not self.ofile:
+            # rr ptid's look like (12481, 12481, 0)
+            use_pid = gdb.selected_thread().ptid[0]
+            self.open_log('{}-{}.json'.format(
+                          data['default_log_prefix'], use_pid))
+
+        # set up breakpoints
         for funcName, info in data['trace'].items():
             info['spec'] = funcName
             bp = LoggingBreakpoint(self, info)
@@ -238,6 +242,8 @@ class TriceLogCommand(gdb.Command):
             self.breakpoints.append(bp)
 
     def open_log(self, name):
+        self.close_log()
+
         path = os.path.join('/tmp', name)
         self.ofile = open(path, 'w')
         print('opened', path, 'for logging')
@@ -274,19 +280,13 @@ class TriceCaptureTester(gdb.Command):
         gdb.Command.__init__(self, 'tcaptest', gdb.COMMAND_NONE)
 
     def invoke(self, arg, from_tty):
-        if arg == 'jsstack':
-            jscx = gdb.parse_and_eval('nsContentUtils::GetCurrentJSContext()')
-            print(jscx)
-            jsstack = gdb.parse_and_eval('JS::FormatStackDump((JSContext*)0x7f52cf923000, nullptr, true, true, false)')
-            return
-
         args = eval(arg)
         print('traversal is:', repr(args))
         print(repr(magic_capture(args, True)))
 
 tct = TriceCaptureTester()
 
-def capture_js_stack():
+def capture_js_stack(verbose=False):
     '''
     Hacky JS Stack capturing built around dubiously using gdb's function
     call magic.  The main reason this is hacky is that we need to invoke
@@ -311,32 +311,53 @@ def capture_js_stack():
       invariant, the nested breakpoint fundamentally is re-entrancy/a nested
       event loop, which is obviously not appealing to most run-times.
     '''
+    # get the JSContext
+    try:
+        if not gdb.parse_and_eval('nsContentUtils::sInitialized'):
+            return None
+        jscx = gdb.parse_and_eval('nsContentUtils::GetCurrentJSContext()')
+        # It's possible there's no
+        if jscx + 0 == 0:
+            return None
+    except:
+        return None
+
     # create an empty JS::UniqueChars zeroed allocation.
     ucSize = gdb.parse_and_eval('sizeof(JS::UniqueChars)')
     emptyUniqueChars = gdb.parse_and_eval('calloc(' + str(ucSize) + ', 1)')
 
-    # get the JSContext
-    jscx = gdb.parse_and_eval('nsContentUtils::GetCurrentJSContext()')
-
     # dump the stack
     # TODO: not leak this.  We just need to pierce to the pointer and free it.
-    jsstack = gdb.parse_and_eval(
-                  'JS::FormatStackDump((JSContext*)' + str(jscx) + ', ' +
-                  '*(JS::UniqueChars *)' + str(emptyUniqueChars) + ', ' +
-                  'true, true, false)')
+    try:
+        # the booleans are: showArgs, showLocals, showThisProps.  Unfortunately,
+        # there's no truncation of the arguments, so like one can end up with
+        # the massive blocklist JSON in there.  While it's possible to
+        # post-process so we don't log the whole thing, the reality is that
+        # there is a performance cost to grabbing the args, so for now we're
+        # going to just disable them.
+        jsstack = gdb.parse_and_eval(
+                      'JS::FormatStackDump((JSContext*)' + str(jscx) + ', ' +
+                      '*(JS::UniqueChars *)' + str(emptyUniqueChars) + ', ' +
+                      'false, false, false)')
+    except:
+        if verbose:
+            print('problem getting JS stack:')
+            traceback.print_exc()
+        jsstack = None
 
     # free the allocated memory
     gdb.parse_and_eval('free((void *)' + str(emptyUniqueChars) + ')')
 
+    if not jsstack:
+        return jsstack
+
     # extract the string
-    print(jsstack)
     name, stackstr = magic_capture([jsstack, 'mTuple', 'mFirstA'],
-                                   verbose=True, stringify=False)
+                                   verbose=False, stringify=False)
     return stackstr.string()
 
 
 class PrettyJSStack(gdb.Command):
-
     def __init__(self):
         gdb.Command.__init__(self, 'pjsstack', gdb.COMMAND_NONE)
 

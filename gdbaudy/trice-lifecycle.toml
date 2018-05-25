@@ -1,3 +1,6 @@
+
+default_log_prefix = "lifecycle"
+
 [trace."nsGlobalWindowInner::FreeInnerObjects"]
 capture = [
   ["mDoc", "mDocumentURI", "mSpec"],
@@ -15,3 +18,18 @@ capture = [
 ]
 stack = true
 jsstack = true
+
+[trace."nsObserverService::NotifyObservers"]
+capture = [
+  ["aTopic"]
+]
+stack = true
+jsstack = true
+
+display = [
+  ["literal", "obs: "],
+  ["lookup", "aTopic"]
+]
+facetBy = [
+  ["aTopic"]
+]
