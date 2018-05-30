@@ -29,12 +29,8 @@ python import sys
 python sys.path[0:0] = ["/path/to/pythongdb-gaudy/"]
 # backtrace, no external dependencies
 python import gdbaudy.bt
-# syntax-highlighting source list, needs pygments
-python import gdbaudy.pyglist
-# mozilla backtrace...
-#  needs http://hg.mozilla.org/users/jblandy_mozilla.com/archer-mozilla/
-#  (follow its install instructions / make sure it is on your sys.path)
-python import gdbaudy.mozbt
+# pretty-printing
+python import gdbaudy.pp
 ### STOP CUTTING HERE ###
 ```
 
@@ -42,6 +38,10 @@ Then you can use:
 - "cbt" as an awesome colorized backtrace
 - "cbt terse" produces the bare necessities of a colorized backtrace
 - "cbt full" is like "cbt" but with locals displayed too.
+- "pp THING" pretty print THING.  Modify gdbaudy/pp-mozilla.yaml to teach it
+   about new types.  Reload using the info below
+
+Things that you used to be able to use but are now bit-rotted or moot:
 - "sl" as an awesome colorized / syntax highlighting "list"-like command.
 - "mbt" as a colorized fused C++/JS mozilla-specific backtrace
 
