@@ -68,14 +68,17 @@ pp mozilla::dom::ContentChild::sSingleton
 I've been out of the Python game for quite some time.  Let's just install the
 deps globally, why not?
 
-`pip install strictyaml`
+If you're on Ubuntu, your gdb is probably using Python3.  In that case you want to:
+* Try: `sudo pip3 install strictyaml`
+* Didn't work because no pip3 is installed?  Try: `sudo apt install python3-pip` to get pip for Python3.
+* Didn't work because you didn't want to use sudo?  Try `pip3 install --user strictyaml` to install them locally instead of globally.
+* Didn't work because you are a time traveler from the past and you're using Python2? `pip install strictyaml` and all the variations above.
 
 ### Okay, I did that, so... ###
 
-The old way is to add something like the following to your `~/.gdbinit`.  But
-the near future is cribbing tromey's installation and python structuring at
-https://github.com/tromey/gdb-helpers
-
+Add something like the following to your `~/.gdbinit`.  There are better ways
+to do this, but this is what I use and my computer has only caught on fire
+twice:
 ```
 python import sys
 python sys.path[0:0] = ["/path/to/pythongdb-gaudy/"]
@@ -83,7 +86,6 @@ python sys.path[0:0] = ["/path/to/pythongdb-gaudy/"]
 python import gdbaudy.bt
 # pretty-printing
 python import gdbaudy.pp
-### STOP CUTTING HERE ###
 ```
 
 Then you can use:
@@ -96,8 +98,15 @@ Then you can use:
    about new types.  Reload using the info below
 
 Things that you used to be able to use but are now bit-rotted or moot:
-- "sl" as an awesome colorized / syntax highlighting "list"-like command.
-- "mbt" as a colorized fused C++/JS mozilla-specific backtrace
+- "sl" as an awesome colorized / syntax highlighting "list"-like command.  I
+  thought this was cool at the time, but searchfox didn't exist then.
+- "mbt" as a colorized fused C++/JS mozilla-specific backtrace.  This was a
+  neat hack in a pre-JIT world, but has not made any sense since then.  Also,
+  SpiderMonkey already has in-tree unwinder support that's disabled by default.
+  It aggressively didn't work for me when I tried it in May, 2018, but YMMV.  In
+  general, the best approach is just to do `call DumpJSStack()`.  tricelog also
+  has some hacky magic to get the info into a string rather than dumping it to
+  stderr (via a buffer capped at 2k).
 
 ## How Do I Develop Them? ##
 
