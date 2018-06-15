@@ -28,3 +28,7 @@ cpm:
 sas:
   name: StorageActivityService
   singleton: mozilla::dom::gStorageActivityService
+
+rws:
+  name: RemoteWorkerService
+  singleton: mozilla::dom::(anonymous namespace)::sRemoteWorkerService
