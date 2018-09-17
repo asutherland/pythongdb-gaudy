@@ -18,6 +18,11 @@ UniquePtr:
 
 ### Other MFBT Fancy Stuff ###
 
+mozilla::Maybe:
+  simple:
+  - mIsSome: true
+  - mStorage: true
+
 mozilla::Atomic:
   kind: Atomic Wrapper
   traverse:
@@ -233,6 +238,7 @@ mozilla::net::LoadInfo:
   simple:
   - mLoadingPrincipal: true
   - mOriginAttributes: true
+  - mController: true
 
 mozilla::net::HttpBaseChannel:
   groups:
@@ -554,3 +560,10 @@ mozilla::dom::workers::ServiceWorkerInfo:
   - mState: true
   - mSkipWaitingFlag: true
   - mHandlesFetch: true
+
+### debugging no-ops for things to ignore:
+mozilla::dom::LocalStorageCacheParent:
+  simple:
+  #- mPrincipalInfo: true
+  - mOriginKey: true
+  #- mPrivateBrowsingId: true

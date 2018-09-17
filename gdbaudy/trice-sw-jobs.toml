@@ -1,0 +1,90 @@
+
+default_log_prefix = "swjobs"
+
+[trace."dom/workers/ScriptLoader.cpp:689"]
+capture = [
+  ["mLoadResult"],
+  ["aRv"]
+]
+stack = true
+display = [
+   ["literal", "LoadingFinished="],
+   ["lookup", "aRv"]
+]
+facetBy = [
+  ["aRv"]
+]
+
+[trace."mozilla::dom::(anonymous namespace)::ScriptLoaderRunnable::RunInternal"]
+[trace."mozilla::dom::(anonymous namespace)::ScriptLoaderRunnable::CancelMainThread"]
+capture = [
+  ["aCancelResult"]
+]
+
+[trace."mozilla::dom::(anonymous namespace)::ScriptLoaderRunnable::LoadScript"]
+capture = [
+  ["aIndex"]
+]
+[trace."mozilla::dom::(anonymous namespace)::ScriptLoaderRunnable::LoadingFinished"]
+capture = [
+  ["aIndex"],
+  ["aRv"]
+]
+
+[trace."mozilla::dom::(anonymous namespace)::ScriptLoaderRunnable::OnStartRequest"]
+capture = [
+  ["aIndex"]
+]
+
+[trace."mozilla::dom::(anonymous namespace)::ScriptLoaderRunnable::OnStreamComplete"]
+capture = [
+  ["aIndex"]
+]
+
+[trace."dom/workers/ScriptLoader.cpp:2061"]
+capture = [
+  ["loadInfo", "mLoadResult"],
+  ["loadInfo", "mURL"]
+]
+
+
+[trace."mozilla::dom::(anonymous namespace)::ScriptLoaderRunnable::OnStreamCompleteInternal"]
+
+[trace."mozilla::dom::(anonymous namespace)::ScriptLoaderRunnable::MaybeExecuteFinishedScripts"]
+capture = [
+  ["aIndex"]
+]
+
+[trace."mozilla::dom::(anonymous namespace)::ScriptLoaderRunnable::ExecuteFinishedScripts"]
+
+[trace."mozilla::dom::(anonymous namespace)::CachePromiseHandler::ResolvedCallback"]
+
+
+[trace."mozilla::dom::ServiceWorkerJob::Finish"]
+capture = [
+  ["aRv"]
+]
+
+[trace."mozilla::dom::ServiceWorkerUpdateJob::ContinueUpdateAfterScriptEval"]
+capture = [
+  ["aScriptEvaluationResult"]
+]
+
+[trace."mozilla::dom::ServiceWorkerUpdateJob::ComparisonResult"]
+capture = [
+  ["aStatus"]
+]
+stack = true
+
+[trace."mozilla::dom::ServiceWorkerUpdateJob::FailUpdateJob"]
+capture = [
+  ["aRv"]
+]
+stack = true
+display = [
+   ["literal", "FailUpdateJob: "],
+   ["lookup", "aRv"]
+]
+facetBy = [
+  ["aRv"]
+]

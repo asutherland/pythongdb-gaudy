@@ -61,6 +61,19 @@ For example, for ContentChild:
 pp mozilla::dom::ContentChild::sSingleton
 ```
 
+### tricelog: Trace logging via gdb breakpoints ###
+This extension lets you load a bunch of breakpoints and data to log, in JSON,
+in a TOML file.  This creates an ndjson file that can then be loaded by the
+grokysis UI.
+
+#### example usage ####
+The following loads the configuration from `gdbaudy/trice-sw-jobs.toml` and
+enables logging to `/tmp/swjobs-PID.json` thanks to the `default_log_prefix` in
+the configuration:
+```
+tricelog load sw-jobs
+```
+
 ## How Do I Install Them? ##
 
 ### Whoops, Dependencies ###
