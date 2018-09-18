@@ -74,6 +74,19 @@ the configuration:
 tricelog load sw-jobs
 ```
 
+Then start the process running so we hit the breakpoints and log them:
+```
+cont
+```
+
+And then when we hit the end of execution, close the log:
+```
+trice closelog
+```
+
+Now you can load up the log in the grokysis UI:
+1.
+
 ## How Do I Install Them? ##
 
 ### Whoops, Dependencies ###
