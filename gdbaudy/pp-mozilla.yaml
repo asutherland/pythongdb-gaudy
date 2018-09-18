@@ -509,6 +509,45 @@ mozilla::dom::indexedDB::FileManager:
     # Commenting out because of recursion; need up/down direction awareness
     # - mFileInfos: true
 
+### Workers ###
+
+#### Remote Workers ####
+mozilla::dom::RemoteWorkerManager:
+  simple:
+    - mActors: true
+    - mPendings: true
+
+mozilla::dom::RemoteWorkerService:
+  simple:
+    - mThread: true
+    - mActor: true
+
+mozilla::dom::RemoteWorkerServiceParent:
+  simple:
+
+
+mozilla::dom::RemoteWorkerServiceChild:
+  simple:
+    - mRefCnt: true
+
+mozilla::dom::RemoteWorkerController:
+  simple:
+  - mObserver: true
+  - mActor: true
+  - mState: true
+  - mPendingOps: true
+
+#### Shared Workers ####
+
+mozilla::dom::SharedWorkerManager:
+  simple:
+  - mLoadingPrincipal: true
+  - mDomain: true
+  - mResolvedScriptURL: true
+  - mName: true
+  - mIsSecureContext: true
+  - mActors: true
+
 
 ### ServiceWorkers ###
 
