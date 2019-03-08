@@ -125,8 +125,10 @@ Our driving goals, aware of the above are then:
     def _log_item_in_map(self, key, val):
         pout("{k}%s{n}:", key)
         pout.i(2)
-        self._inspect(val)
-        pout.i(-2)
+        try:
+            self._inspect(val)
+        finally:
+            pout.i(-2)
 
     def _log_exit_map(self, val, tname):
         pout.i(-2)
@@ -161,11 +163,13 @@ Our driving goals, aware of the above are then:
     def _log_field_in_detailed_object(self, key, val, displayMode):
         pout("{k}%s{n}:", key)
         pout.i(2)
-        explicit_type = None
-        if displayMode != 'true' and displayMode is not True:
-            explicit_type = displayMode
-        self._inspect(val, explicit_type)
-        pout.i(-2)
+        try:
+            explicit_type = None
+            if displayMode != 'true' and displayMode is not True:
+                explicit_type = displayMode
+            self._inspect(val, explicit_type)
+        finally:
+            pout.i(-2)
 
     def _log_exit_object_group(self, groupName, rule):
         pout.i(-2)
@@ -292,33 +296,38 @@ first-class understanding of enums so we can pretty print the namespaces.
     def _print_simple(self, val, rule, tname):
         # multi-line object display without groups.
         self._log_enter_detailed_object(val, rule, tname)
-        for fieldDef in rule["simple"]:
-            for fieldName, displayMode in fieldDef.items():
-                try:
-                    self._log_field_in_detailed_object(fieldName, val[fieldName],
-                                                       displayMode)
-                except Exception as e:
-                    pout("{e}Exception inspecting field %s: %s", fieldName, e)
-        self._log_exit_detailed_object(val, rule, tname)
+        try:
+            for fieldDef in rule["simple"]:
+                for fieldName, displayMode in fieldDef.items():
+                    try:
+                        self._log_field_in_detailed_object(fieldName, val[fieldName],
+                                                           displayMode)
+                    except Exception as e:
+                        pout("{e}Exception inspecting field %s: %s", fieldName, e)
+        finally:
+            self._log_exit_detailed_object(val, rule, tname)
 
     def _print_groups(self, val, rule, tname):
         # multi-line object display without groups.
         self._log_enter_detailed_object(val, rule, tname)
 
-        for groupDef in rule["groups"]:
-            for groupName, fieldDefs in groupDef.items():
-                self._log_enter_object_group(groupName, rule)
+        try:
+            for groupDef in rule["groups"]:
+                for groupName, fieldDefs in groupDef.items():
+                    self._log_enter_object_group(groupName, rule)
 
-                for fieldDef in fieldDefs:
-                    for fieldName, displayMode in fieldDef.items():
-                        try:
-                            self._log_field_in_detailed_object(fieldName, val[fieldName],
-                                                               displayMode)
-                        except Exception as e:
-                            pout("{e}Exception inspecting field %s: %s", fieldName, e)
-
-                self._log_exit_object_group(groupName, rule)
-        self._log_exit_detailed_object(val, rule, tname)
+                    try:
+                        for fieldDef in fieldDefs:
+                            for fieldName, displayMode in fieldDef.items():
+                                try:
+                                    self._log_field_in_detailed_object(fieldName, val[fieldName],
+                                                                       displayMode)
+                                except Exception as e:
+                                    pout("{e}Exception inspecting field %s: %s", fieldName, e)
+                    finally:
+                        self._log_exit_object_group(groupName, rule)
+        finally:
+            self._log_exit_detailed_object(val, rule, tname)
 
 
 
@@ -433,7 +442,8 @@ the feature space.
                 pout("{n}%s", str(val))
                 return
 
-
+        pout.v("{s}Falling back to default visualizer for type %s",
+               tname)
         vis = gdb.default_visualizer(val)
         if vis and hasattr(vis, 'children'):
             if hasattr(vis, 'display_hint'):
@@ -460,10 +470,18 @@ the feature space.
         pout("{n}%s", str(val))
 
     def invoke(self, arg, from_tty):
+        verbose = False
+        # We want a flag here...
+        if arg.startswith('/v'):
+            verbose = True
+            pout._verbose = True
+            arg = arg[3:]
         # zero out our indentation in the event of exceptions breaking things.
         pout.i(-1000)
         val = gdb.parse_and_eval(arg)
         self._inspect(val)
+        if verbose:
+            pout._verbose = False
 
 
 PrettyPrintCommand()

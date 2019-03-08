@@ -16,6 +16,8 @@ UniquePtr:
     - mTuple
     - mFirstA
 
+mozilla::UniquePtr: UniquePtr
+
 ### Other MFBT Fancy Stuff ###
 
 mozilla::Maybe:
@@ -61,6 +63,13 @@ PRThread:
   simple:
   - name: true
   - tid: true
+
+nsID:
+  terse:
+  - m0: true
+  - m1: true
+  - m2: true
+  - m3: true
 
 # This absolutely needs its own pretty-printer, or some kind of hacky helper
 # logic to regex from nsIDataType's VTYPE_BLAH into picking the right mBlah
@@ -228,7 +237,7 @@ mozilla::net::nsHttpAtom:
   kind: nsHttpAtom
   traverse:
   - _val
-  
+
 
 mozilla::net::nsLoadGroup:
   simple:
@@ -281,7 +290,7 @@ nsDataChannel:
     - mLoadInfo: true
   - consumers:
     - mListener: true
-    
+
 mozilla::net::DataChannelChild: nsDataChannel
 
 ProxyListener:
@@ -308,6 +317,20 @@ mozilla::net::HttpChannelParent:
     - mSuspendedForDiversion: true
     - mSuspendAfterSynthesizeResponse: true
     - mWillSynthesizeResponse: true
+
+mozilla::dom::ClientSourceParent:
+  simple:
+  - mClientInfo: true
+
+mozilla::dom::ClientInfo:
+  kind: ClientInfo
+  traverse:
+  - mData
+
+mozilla::dom::IPCClientInfo:
+  simple:
+  - url_: true
+  - type_: true
 
 # this alias is useful, but we really want to subclass our defs for basechannel
 mozilla::net::InterceptedHttpChannel: mozilla::net::HttpBaseChannel

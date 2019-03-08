@@ -32,3 +32,11 @@ sas:
 rws:
   name: RemoteWorkerService
   singleton: mozilla::dom::(anonymous namespace)::sRemoteWorkerService
+
+cms:
+  name: ClientManagerService
+  singleton: mozilla::dom::(anonymous namespace)::sClientManagerServiceInstance
+
+clients:
+    name: Clients
+    singleton: mozilla::dom::(anonymous namespace)::sClientManagerServiceInstance->mSourceTable
