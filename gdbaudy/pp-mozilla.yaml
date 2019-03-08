@@ -560,6 +560,19 @@ mozilla::dom::RemoteWorkerController:
   - mState: true
   - mPendingOps: true
 
+mozilla::dom::RemoteWorkerData:
+  simple:
+  - originalScriptURL_: true
+  - baseScriptURL_: true
+  - resolvedScriptURL_: true
+  - name_: true
+  - loadingPrincipalInfo_: true
+  # skip CSP
+  - principalInfo_: true
+  - isSecureContext_: true
+  - clientInfo_: true
+  - isSharedWorker_: true
+
 #### Shared Workers ####
 
 mozilla::dom::SharedWorkerManager:
