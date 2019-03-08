@@ -321,6 +321,9 @@ mozilla::net::HttpChannelParent:
 mozilla::dom::ClientSourceParent:
   simple:
   - mClientInfo: true
+  - mController: true
+  - mExecutionReady: true
+  - mFrozen: true
 
 mozilla::dom::ClientInfo:
   kind: ClientInfo
@@ -330,7 +333,14 @@ mozilla::dom::ClientInfo:
 mozilla::dom::IPCClientInfo:
   simple:
   - url_: true
+  - principalInfo_: true
   - type_: true
+
+# this actually wants to be smart enough to break out the underlying types,
+# probably via a smarter generic helper
+mozilla::dom::IPCClientInfo::PrincipalInfo:
+  terse:
+  - mType: true
 
 # this alias is useful, but we really want to subclass our defs for basechannel
 mozilla::net::InterceptedHttpChannel: mozilla::net::HttpBaseChannel
